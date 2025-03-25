@@ -6,7 +6,7 @@ const bcrypt = require('bcrypt');
 
 const app = express();
 app.use(cors({
-  origin: '*',  // Allow requests from any origin (for development only)
+  origin: '*',  // For development - you should restrict this in production
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
@@ -376,10 +376,13 @@ for (const table of tables) {
     });
 }
 
-// Start Server
+// Start Server for local development
 const PORT = process.env.PORT || 4000;
-app.listen(PORT, () => {
-    console.log(`🚀 Backend running on port ${PORT}`);
-});
+if (process.env.NODE_ENV !== 'production') {
+    app.listen(PORT, () => {
+        console.log(`🚀 Backend running on port ${PORT}`);
+    });
+}
 
+// Export for Vercel
 module.exports = app;

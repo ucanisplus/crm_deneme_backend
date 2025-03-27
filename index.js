@@ -289,7 +289,74 @@ app.post('/api/change-password', async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 });
+// Fixed version of the profile picture endpoints (table name cannot have a hyphen)
 
+// Get user profile picture
+app.get('/api/user/profile-picture', async (req, res) => {
+  try {
+    const { username } = req.query;
+    
+    if (!username) {
+      return res.status(400).json({ error: 'Username is required' });
+    }
+    
+    // Note the table name is now profile_pictures (with underscore)
+    const result = await pool.query(`
+      SELECT * FROM profile_pictures 
+      WHERE username = $1
+    `, [username]);
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Profile picture not found' });
+    }
+    
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error("Error fetching profile picture:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Create or update profile picture
+app.post('/api/user/profile-picture', async (req, res) => {
+  try {
+    const { username, pp_url } = req.body;
+    
+    if (!username || !pp_url) {
+      return res.status(400).json({ error: 'Username and profile picture URL are required' });
+    }
+    
+    // Check if profile picture already exists for user
+    const existingPP = await pool.query(`
+      SELECT * FROM profile_pictures 
+      WHERE username = $1
+    `, [username]);
+    
+    let result;
+    
+    if (existingPP.rows.length > 0) {
+      // Update existing profile picture
+      result = await pool.query(`
+        UPDATE profile_pictures 
+        SET pp_url = $1 
+        WHERE username = $2 
+        RETURNING *
+      `, [pp_url, username]);
+    } else {
+      // Create new profile picture entry
+      result = await pool.query(`
+        INSERT INTO profile_pictures (id, username, pp_url) 
+        VALUES (uuid_generate_v4(), $1, $2) 
+        RETURNING *
+      `, [username, pp_url]);
+    }
+    
+    res.status(200).json(result.rows[0]);
+  } catch (error) {
+    console.error("Error updating profile picture:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
 // Existing Tables
 const tables = [
     'panel_cost_cal_currency',

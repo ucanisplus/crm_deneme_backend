@@ -425,23 +425,6 @@ for (const table of tables) {
     });
 }
 
-// Generic DELETE Route for Removing Data
-for (const table of tables) {
-    app.delete(`/api/${table}/:id`, async (req, res) => {
-        try {
-            const { id } = req.params;
-            const query = `DELETE FROM ${table} WHERE id = $1 RETURNING *`;
-            const result = await pool.query(query, [id]);
-            if (result.rows.length === 0) {
-                return res.status(404).json({ error: "Record not found" });
-            }
-            res.json({ message: "Record deleted successfully", deletedRecord: result.rows[0] });
-        } catch (error) {
-            console.error(`Error deleting data from ${table}:`, error);
-            res.status(500).json({ error: error.message });
-        }
-    });
-}
 //new part baslangıc
 
 // Custom DELETE ALL endpoints for calculation reset
@@ -468,8 +451,23 @@ app.delete('/api/panel_cost_cal_maliyet_listesi/all', async (req, res) => {
 
 // new part bitis
 
-
-
+// Generic DELETE Route for Removing Data
+for (const table of tables) {
+    app.delete(`/api/${table}/:id`, async (req, res) => {
+        try {
+            const { id } = req.params;
+            const query = `DELETE FROM ${table} WHERE id = $1 RETURNING *`;
+            const result = await pool.query(query, [id]);
+            if (result.rows.length === 0) {
+                return res.status(404).json({ error: "Record not found" });
+            }
+            res.json({ message: "Record deleted successfully", deletedRecord: result.rows[0] });
+        } catch (error) {
+            console.error(`Error deleting data from ${table}:`, error);
+            res.status(500).json({ error: error.message });
+        }
+    });
+}
 
 
 // Start Server for local development

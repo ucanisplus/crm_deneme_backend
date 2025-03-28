@@ -442,6 +442,35 @@ for (const table of tables) {
         }
     });
 }
+//new part baslangıc
+
+// Custom DELETE ALL endpoints for calculation reset
+app.delete('/api/panel_cost_cal_gecici_hesaplar/all', async (req, res) => {
+  try {
+    await pool.query('DELETE FROM panel_cost_cal_gecici_hesaplar');
+    res.json({ message: 'All temporary records deleted.' });
+  } catch (error) {
+    console.error("Error deleting all gecici_hesaplar:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/panel_cost_cal_maliyet_listesi/all', async (req, res) => {
+  try {
+    await pool.query('DELETE FROM panel_cost_cal_maliyet_listesi');
+    res.json({ message: 'All cost records deleted.' });
+  } catch (error) {
+    console.error("Error deleting all maliyet_listesi:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+
+// new part bitis
+
+
+
+
 
 // Start Server for local development
 const PORT = process.env.PORT || 4000;

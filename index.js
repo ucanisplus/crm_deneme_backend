@@ -392,6 +392,11 @@ for (const table of tables) {
             const values = Object.values(data);
 
             const query = `INSERT INTO ${table} (${columns}) VALUES (${placeholders}) RETURNING *`;
+           
+            console.log("📥 Inserting into:", table);
+            console.log("🧾 Columns:", columns);
+            console.log("📎 Values:", values);
+
             const result = await pool.query(query, values);
             res.status(201).json(result.rows[0]);
           } catch (error) {

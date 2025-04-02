@@ -394,10 +394,12 @@ for (const table of tables) {
             const query = `INSERT INTO ${table} (${columns}) VALUES (${placeholders}) RETURNING *`;
             const result = await pool.query(query, values);
             res.status(201).json(result.rows[0]);
-        } catch (error) {
-            console.error(`Error inserting data into ${table}:`, error);
+          } catch (error) {
+            console.error(`❌ Insert failed for table '${table}':`, error);
+            console.error("🧾 Payload:", req.body);
             res.status(500).json({ error: error.message });
-        }
+          }
+
     });
 }
 

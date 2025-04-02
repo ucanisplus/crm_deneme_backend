@@ -402,7 +402,11 @@ for (const table of tables) {
           } catch (error) {
             console.error(`❌ Insert failed for table '${table}':`, error);
             console.error("🧾 Payload:", req.body);
-            res.status(500).json({ error: error.message });
+            res.status(500).json({ 
+            error: error.message,
+            stack: error.stack,
+            });
+
           }
 
     });

@@ -366,7 +366,12 @@ const tables = [
     'panel_cost_cal_panel_cit_degiskenler',
     'panel_cost_cal_panel_list',
     'panel_cost_cal_profil_degiskenler',
-    'panel_cost_cal_statik_degiskenler'
+    'panel_cost_cal_statik_degiskenler',
+
+//  Galvanizli Tel tabloları
+
+    
+
 ];
 
 // Generic GET Route for Fetching Data

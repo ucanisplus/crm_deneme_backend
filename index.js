@@ -368,9 +368,16 @@ const tables = [
     'panel_cost_cal_profil_degiskenler',
     'panel_cost_cal_statik_degiskenler',
 
-//  Galvanizli Tel tabloları
+    //  Galvanizli Tel tabloları
 
-    
+    'gal_cost_cal_mm_gt',
+    'gal_cost_cal_ym_gt',
+    'gal_cost_cal_ym_st',
+    'gal_cost_cal_mm_gt_recete',
+    'gal_cost_cal_ym_gt_recete',
+    'gal_cost_cal_ym_st_recete',
+    'gal_cost_cal_mm_gt_ym_st',
+    'gal_cost_cal_sequence'
 
 ];
 

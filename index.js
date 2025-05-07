@@ -26,9 +26,10 @@ const normalizeNumber = (value) => {
   }
   
   if (typeof value === 'string') {
-    // Virgülleri noktalara çevir
+    // Virgülleri noktalara çevir - global flag ile tüm virgülleri değiştir
+    // Önceki kod sadece ilk virgülü değiştiriyordu
     if (value.includes(',')) {
-      return parseFloat(value.replace(',', '.'));
+      return parseFloat(value.replace(/,/g, '.'));
     }
     
     // Sayısal değer mi kontrol et
@@ -458,7 +459,7 @@ for (const table of tables) {
                 
                 // Virgüllü değer varsa noktaya çevir
                 const normalizedCap = typeof cap === 'string' && cap.includes(',') 
-                    ? parseFloat(cap.replace(',', '.')) 
+                    ? parseFloat(cap.replace(/,/g, '.')) // Global flag ile tüm virgülleri değiştir
                     : parseFloat(cap);
                 
                 whereConditions.push(`cap = $${queryParams.length + 1}`);
@@ -486,6 +487,8 @@ for (const table of tables) {
             console.log("📝 Parametreler:", queryParams);
             
             const result = await pool.query(query, queryParams);
+            
+            // API tutarlılığı: Her zaman dizi döndür, boş sonuç için boş dizi
             res.json(result.rows);
         } catch (error) {
             console.error(`${table} tablosundan veri getirme hatası:`, error);
@@ -577,6 +580,8 @@ for (const table of tables) {
             if (result.rows.length === 0) {
                 return res.status(404).json({ error: "Kayıt bulunamadı" });
             }
+            
+            // Tutarlı API yanıtı - her zaman tek bir nesne döndür
             res.json(result.rows[0]);
         } catch (error) {
             console.error(`${table} tablosunda veri güncelleme hatası:`, error);

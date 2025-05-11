@@ -418,15 +418,130 @@ const tables = [
     'gal_cost_cal_ym_gt_recete',
     'gal_cost_cal_ym_st_recete',
     'gal_cost_cal_mm_gt_ym_st',
-    'gal_cost_cal_sequence'
+    'gal_cost_cal_sequence',
+    'gal_cost_cal_sal_requests' // Yeni talepler tablosu ekledik
 ];
+
+// Tablo varlığını kontrol et, yoksa oluştur
+async function checkAndCreateTable(tableName) {
+  try {
+    // Tablo var mı kontrol et
+    const checkResult = await pool.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name = $1
+      );
+    `, [tableName]);
+    
+    if (!checkResult.rows[0].exists) {
+      console.log(`Tablo '${tableName}' bulunamadı, oluşturuluyor...`);
+      
+      let createTableQuery = '';
+      
+      // Tablo tipine göre oluştur
+      if (tableName === 'gal_cost_cal_sal_requests') {
+        createTableQuery = `
+          CREATE TABLE ${tableName} (
+            id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            status VARCHAR(50) DEFAULT 'pending',
+            data JSONB NOT NULL,
+            title VARCHAR(255),
+            description TEXT,
+            created_by VARCHAR(255),
+            processed_by VARCHAR(255),
+            rejection_reason TEXT,
+            processed_at TIMESTAMP WITH TIME ZONE
+          )
+        `;
+      } else if (tableName.endsWith('_recete')) {
+        // Reçete tabloları
+        createTableQuery = `
+          CREATE TABLE ${tableName} (
+            id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            stok_kodu VARCHAR(255),
+            stok_adi VARCHAR(255),
+            miktar NUMERIC(10, 4),
+            birim VARCHAR(50),
+            sira INT,
+            mm_gt_id UUID,
+            ym_gt_id UUID,
+            ym_st_id UUID
+          )
+        `;
+      } else if (tableName === 'gal_cost_cal_mm_gt_ym_st') {
+        // MM GT - YM ST ilişki tablosu
+        createTableQuery = `
+          CREATE TABLE ${tableName} (
+            id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            mm_gt_id UUID NOT NULL,
+            ym_st_id UUID NOT NULL,
+            sira INT,
+            UNIQUE(mm_gt_id, ym_st_id)
+          )
+        `;
+      } else {
+        // Genel tablolar
+        createTableQuery = `
+          CREATE TABLE ${tableName} (
+            id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            stok_kodu VARCHAR(255),
+            aciklama TEXT,
+            cap NUMERIC(10, 4),
+            kod_2 VARCHAR(50),
+            kaplama INT,
+            min_mukavemet INT,
+            max_mukavemet INT,
+            tolerans_plus NUMERIC(10, 4),
+            tolerans_minus NUMERIC(10, 4),
+            ic_cap INT,
+            dis_cap INT,
+            kg INT,
+            mm_gt_id UUID,
+            ym_gt_id UUID
+          )
+        `;
+      }
+      
+      await pool.query(createTableQuery);
+      console.log(`Tablo '${tableName}' başarıyla oluşturuldu.`);
+    }
+  } catch (error) {
+    console.error(`Tablo kontrol/oluşturma hatası (${tableName}):`, error);
+    throw error;
+  }
+}
+
+// Uygulama başladığında tüm tabloları kontrol et
+async function checkAllTables() {
+  try {
+    console.log("Tablolar kontrol ediliyor...");
+    for (const tableName of tables) {
+      await checkAndCreateTable(tableName);
+    }
+    console.log("Tüm tablolar kontrol edildi ve gerekirse oluşturuldu.");
+  } catch (error) {
+    console.error("Tablo kontrol hatası:", error);
+  }
+}
+
+// Uygulama başlatıldığında tabloları kontrol et
+checkAllTables();
 
 // Veri Getirmek için Genel GET Rotası
 for (const table of tables) {
     app.get(`/api/${table}`, async (req, res) => {
         try {
             // URL'den sorgu parametrelerini al
-            const { id, mm_gt_id, ym_gt_id, ym_st_id, kod_2, cap, stok_kodu, ids } = req.query;
+            const { id, mm_gt_id, ym_gt_id, ym_st_id, kod_2, cap, stok_kodu, ids, status } = req.query;
             
             let query = `SELECT * FROM ${table}`;
             const queryParams = [];
@@ -478,9 +593,20 @@ for (const table of tables) {
                 idList.forEach(id => queryParams.push(id));
             }
             
+            // Talep durumu filtreleme
+            if (status && table === 'gal_cost_cal_sal_requests') {
+                whereConditions.push(`status = $${queryParams.length + 1}`);
+                queryParams.push(status);
+            }
+            
             // WHERE koşullarını ekle
             if (whereConditions.length > 0) {
                 query += ` WHERE ${whereConditions.join(' AND ')}`;
+            }
+            
+            // Sıralama ekle
+            if (table === 'gal_cost_cal_sal_requests') {
+                query += ` ORDER BY created_at DESC`;
             }
             
             console.log(`🔍 ${table} için sorgu:`, query);
@@ -496,6 +622,82 @@ for (const table of tables) {
         }
     });
 }
+
+// Talep sayısını getir
+app.get('/api/gal_cost_cal_sal_requests/count', async (req, res) => {
+  try {
+    const { status } = req.query;
+    let query = 'SELECT COUNT(*) FROM gal_cost_cal_sal_requests';
+    const queryParams = [];
+    
+    if (status) {
+      query += ' WHERE status = $1';
+      queryParams.push(status);
+    }
+    
+    const result = await pool.query(query, queryParams);
+    res.json({ count: parseInt(result.rows[0].count) });
+  } catch (error) {
+    console.error('Talep sayısı alma hatası:', error);
+    res.status(500).json({ error: 'Talep sayısı alınamadı' });
+  }
+});
+
+// Talep onaylama
+app.put('/api/gal_cost_cal_sal_requests/:id/approve', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { processed_by } = req.body;
+    
+    const query = `
+      UPDATE gal_cost_cal_sal_requests
+      SET status = 'approved', processed_by = $1, processed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+      WHERE id = $2
+      RETURNING *
+    `;
+    
+    const result = await pool.query(query, [processed_by, id]);
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Talep bulunamadı' });
+    }
+    
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Talep onaylama hatası:', error);
+    res.status(500).json({ error: 'Talep onaylanamadı: ' + error.message });
+  }
+});
+
+// Talep reddetme
+app.put('/api/gal_cost_cal_sal_requests/:id/reject', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { processed_by, rejection_reason } = req.body;
+    
+    if (!rejection_reason) {
+      return res.status(400).json({ error: 'Reddetme sebebi gereklidir' });
+    }
+    
+    const query = `
+      UPDATE gal_cost_cal_sal_requests
+      SET status = 'rejected', processed_by = $1, rejection_reason = $2, processed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+      WHERE id = $3
+      RETURNING *
+    `;
+    
+    const result = await pool.query(query, [processed_by, rejection_reason, id]);
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Talep bulunamadı' });
+    }
+    
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Talep reddetme hatası:', error);
+    res.status(500).json({ error: 'Talep reddedilemedi: ' + error.message });
+  }
+});
 
 // Veri Eklemek için Genel POST Rotası
 for (const table of tables) {
@@ -686,6 +888,50 @@ for (const table of tables) {
         }
     });
 }
+
+// Sıralı numara almak için endpoint
+app.get('/api/gal_cost_cal_sequence/next', async (req, res) => {
+  try {
+    const { kod_2, cap } = req.query;
+    
+    if (!kod_2 || !cap) {
+      return res.status(400).json({ error: 'kod_2 ve cap parametreleri gerekli' });
+    }
+    
+    // Virgüllü cap değerini noktalı formata dönüştür
+    let normalizedCap = cap;
+    if (typeof cap === 'string' && cap.includes(',')) {
+      normalizedCap = cap.replace(/,/g, '.');
+    }
+    
+    // Formatı kontrol et
+    const formattedCap = parseFloat(normalizedCap).toFixed(2).replace('.', '').padStart(4, '0');
+    
+    // Bu kombinasyon için en yüksek sıra numarasını bul
+    const result = await pool.query(`
+      SELECT MAX(CAST(SUBSTRING(stok_kodu FROM 10 FOR 2) AS INTEGER)) as max_seq
+      FROM gal_cost_cal_mm_gt
+      WHERE kod_2 = $1 AND stok_kodu LIKE $2
+    `, [kod_2, `GT.${kod_2}.${formattedCap}.%`]);
+    
+    let nextSeq = 1;
+    if (result.rows.length > 0 && result.rows[0].max_seq !== null) {
+      nextSeq = result.rows[0].max_seq + 1;
+    }
+    
+    // 2 basamaklı sıra numarası formatı
+    const formattedSeq = nextSeq.toString().padStart(2, '0');
+    
+    res.json({ 
+      next_sequence: nextSeq,
+      formatted_sequence: formattedSeq,
+      stok_kodu: `GT.${kod_2}.${formattedCap}.${formattedSeq}`
+    });
+  } catch (error) {
+    console.error('Sıra numarası alma hatası:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
 
 // Yerel geliştirme için Sunucu Başlatma
 const PORT = process.env.PORT || 4000;

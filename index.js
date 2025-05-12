@@ -453,7 +453,19 @@ async function checkAndCreateTable(tableName) {
             created_by VARCHAR(255),
             processed_by VARCHAR(255),
             rejection_reason TEXT,
-            processed_at TIMESTAMP WITH TIME ZONE
+            processed_at TIMESTAMP WITH TIME ZONE,
+            cap NUMERIC(10, 4),
+            kod_2 VARCHAR(50),
+            kaplama INT,
+            min_mukavemet INT,
+            max_mukavemet INT,
+            kg INT,
+            ic_cap INT,
+            dis_cap INT,
+            tolerans_plus NUMERIC(10, 4),
+            tolerans_minus NUMERIC(10, 4),
+            shrink VARCHAR(50),
+            unwinding VARCHAR(50)
           )
         `;
       } else if (tableName.endsWith('_recete')) {
@@ -463,11 +475,19 @@ async function checkAndCreateTable(tableName) {
             id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
             created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-            stok_kodu VARCHAR(255),
-            stok_adi VARCHAR(255),
-            miktar NUMERIC(10, 4),
-            birim VARCHAR(50),
-            sira INT,
+            mamul_kodu VARCHAR(255),
+            bilesen_kodu VARCHAR(255),
+            miktar NUMERIC(15, 8),
+            sira_no INT,
+            operasyon_bilesen VARCHAR(50),
+            olcu_br VARCHAR(10),
+            olcu_br_bilesen VARCHAR(10),
+            aciklama TEXT,
+            ua_dahil_edilsin VARCHAR(10),
+            son_operasyon VARCHAR(10),
+            uretim_suresi NUMERIC(15, 8),
+            recete_top NUMERIC(10, 4),
+            fire_orani NUMERIC(10, 8),
             mm_gt_id UUID,
             ym_gt_id UUID,
             ym_st_id UUID
@@ -494,7 +514,21 @@ async function checkAndCreateTable(tableName) {
             created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
             stok_kodu VARCHAR(255),
+            stok_adi TEXT,
             aciklama TEXT,
+            grup_kodu VARCHAR(50),
+            kod_1 VARCHAR(50),
+            kod_2 VARCHAR(50),
+            muh_detay VARCHAR(50),
+            depo_kodu VARCHAR(50),
+            br_1 VARCHAR(10),
+            br_2 VARCHAR(10),
+            pay_1 INT,
+            payda_1 NUMERIC(10, 3),
+            cevrim_degeri_1 NUMERIC(10, 4),
+            cevrim_pay_2 INT,
+            cevrim_payda_2 INT,
+            cevrim_degeri_2 NUMERIC(10, 4),
             cap NUMERIC(10, 4),
             kod_2 VARCHAR(50),
             kaplama INT,
@@ -506,7 +540,25 @@ async function checkAndCreateTable(tableName) {
             dis_cap INT,
             kg INT,
             mm_gt_id UUID,
-            ym_gt_id UUID
+            ym_gt_id UUID,
+            ym_st_id UUID,
+            filmasin INT,
+            quality VARCHAR(10),
+            satis_kdv_orani VARCHAR(10),
+            alis_kdv_orani VARCHAR(10),
+            stok_turu VARCHAR(10),
+            esnek_yapilandir VARCHAR(10),
+            super_recete_kullanilsin VARCHAR(10),
+            alis_doviz_tipi INT,
+            gumruk_tarife_kodu VARCHAR(50),
+            ingilizce_isim TEXT,
+            amb_shrink VARCHAR(50),
+            shrink VARCHAR(50),
+            unwinding VARCHAR(50),
+            cast_kont VARCHAR(50),
+            helix_kont VARCHAR(50),
+            elongation VARCHAR(50),
+            ozel_saha_1_say INT
           )
         `;
       }
@@ -541,7 +593,7 @@ for (const table of tables) {
     app.get(`/api/${table}`, async (req, res) => {
         try {
             // URL'den sorgu parametrelerini al
-            const { id, mm_gt_id, ym_gt_id, ym_st_id, kod_2, cap, stok_kodu, ids, status } = req.query;
+            const { id, mm_gt_id, ym_gt_id, ym_st_id, kod_2, cap, stok_kodu, stok_kodu_like, ids, status } = req.query;
             
             let query = `SELECT * FROM ${table}`;
             const queryParams = [];
@@ -584,6 +636,12 @@ for (const table of tables) {
             if (stok_kodu) {
                 whereConditions.push(`stok_kodu = $${queryParams.length + 1}`);
                 queryParams.push(stok_kodu);
+            }
+            
+            // Pattern arama için LIKE operatörü
+            if (stok_kodu_like) {
+                whereConditions.push(`stok_kodu LIKE $${queryParams.length + 1}`);
+                queryParams.push(`${stok_kodu_like}%`);
             }
             
             // Çoklu ID araması için
@@ -814,44 +872,89 @@ app.delete('/api/panel_cost_cal_maliyet_listesi/all', async (req, res) => {
   }
 });
 
-// İlişkili Kayıtları Silme Yardımcı Fonksiyonu
+// İlişkili Kayıtları Silme Yardımcı Fonksiyonu - İyileştirilmiş hata yönetimi
 async function deleteRelatedRecords(table, id) {
   try {
+    console.log(`🧹 ${table} tablosundan ID:${id} için ilişkili kayıtlar siliniyor...`);
+    
     // MM GT siliniyorsa, ilgili YM GT ve ilişkili reçeteleri sil
     if (table === 'gal_cost_cal_mm_gt') {
-      // İlişkili YM GT kayıtlarını bul
-      const ymGtResult = await pool.query('SELECT id FROM gal_cost_cal_ym_gt WHERE mm_gt_id = $1', [id]);
-      
-      // Her bir YM GT için ilişkili reçeteleri sil
-      for (const ymGt of ymGtResult.rows) {
-        await pool.query('DELETE FROM gal_cost_cal_ym_gt_recete WHERE ym_gt_id = $1', [ymGt.id]);
+      try {
+        // İlişkili YM GT kayıtlarını bul
+        const ymGtResult = await pool.query('SELECT id FROM gal_cost_cal_ym_gt WHERE mm_gt_id = $1', [id]);
+        console.log(`🔍 Bulunan YM GT sayısı: ${ymGtResult.rows.length}`);
+        
+        // Her bir YM GT için ilişkili reçeteleri sil
+        for (const ymGt of ymGtResult.rows) {
+          try {
+            await pool.query('DELETE FROM gal_cost_cal_ym_gt_recete WHERE ym_gt_id = $1', [ymGt.id]);
+            console.log(`✅ YM GT reçetesi silindi: ${ymGt.id}`);
+          } catch (error) {
+            console.log(`⚠️ YM GT reçetesi silinirken hata (${ymGt.id}):`, error.message);
+          }
+        }
+        
+        // YM GT kayıtlarını sil
+        try {
+          const deletedYmGt = await pool.query('DELETE FROM gal_cost_cal_ym_gt WHERE mm_gt_id = $1', [id]);
+          console.log(`✅ YM GT kayıtları silindi: ${deletedYmGt.rowCount}`);
+        } catch (error) {
+          console.log(`⚠️ YM GT kayıtları silinirken hata:`, error.message);
+        }
+        
+        // MM GT-YM ST ilişkilerini sil
+        try {
+          const deletedRelations = await pool.query('DELETE FROM gal_cost_cal_mm_gt_ym_st WHERE mm_gt_id = $1', [id]);
+          console.log(`✅ MM GT-YM ST ilişkileri silindi: ${deletedRelations.rowCount}`);
+        } catch (error) {
+          console.log(`⚠️ MM GT-YM ST ilişkileri silinirken hata:`, error.message);
+        }
+        
+        // MM GT reçetelerini sil
+        try {
+          const deletedRecipes = await pool.query('DELETE FROM gal_cost_cal_mm_gt_recete WHERE mm_gt_id = $1', [id]);
+          console.log(`✅ MM GT reçeteleri silindi: ${deletedRecipes.rowCount}`);
+        } catch (error) {
+          console.log(`⚠️ MM GT reçeteleri silinirken hata:`, error.message);
+        }
+      } catch (error) {
+        console.error(`❌ MM GT ilişkili kayıtları silinirken hata:`, error);
       }
-      
-      // YM GT kayıtlarını sil
-      await pool.query('DELETE FROM gal_cost_cal_ym_gt WHERE mm_gt_id = $1', [id]);
-      
-      // MM GT-YM ST ilişkilerini sil
-      await pool.query('DELETE FROM gal_cost_cal_mm_gt_ym_st WHERE mm_gt_id = $1', [id]);
-      
-      // MM GT reçetelerini sil
-      await pool.query('DELETE FROM gal_cost_cal_mm_gt_recete WHERE mm_gt_id = $1', [id]);
     }
     
     // YM GT siliniyorsa, ilişkili reçeteleri sil
     if (table === 'gal_cost_cal_ym_gt') {
-      await pool.query('DELETE FROM gal_cost_cal_ym_gt_recete WHERE ym_gt_id = $1', [id]);
+      try {
+        const deletedRecipes = await pool.query('DELETE FROM gal_cost_cal_ym_gt_recete WHERE ym_gt_id = $1', [id]);
+        console.log(`✅ YM GT reçeteleri silindi: ${deletedRecipes.rowCount}`);
+      } catch (error) {
+        console.log(`⚠️ YM GT reçeteleri silinirken hata:`, error.message);
+      }
     }
     
     // YM ST siliniyorsa, ilişkili MM GT-YM ST ilişkilerini ve reçeteleri sil
     if (table === 'gal_cost_cal_ym_st') {
-      await pool.query('DELETE FROM gal_cost_cal_mm_gt_ym_st WHERE ym_st_id = $1', [id]);
-      await pool.query('DELETE FROM gal_cost_cal_ym_st_recete WHERE ym_st_id = $1', [id]);
+      try {
+        const deletedRelations = await pool.query('DELETE FROM gal_cost_cal_mm_gt_ym_st WHERE ym_st_id = $1', [id]);
+        console.log(`✅ MM GT-YM ST ilişkileri silindi: ${deletedRelations.rowCount}`);
+      } catch (error) {
+        console.log(`⚠️ MM GT-YM ST ilişkileri silinirken hata:`, error.message);
+      }
+      
+      try {
+        const deletedRecipes = await pool.query('DELETE FROM gal_cost_cal_ym_st_recete WHERE ym_st_id = $1', [id]);
+        console.log(`✅ YM ST reçeteleri silindi: ${deletedRecipes.rowCount}`);
+      } catch (error) {
+        console.log(`⚠️ YM ST reçeteleri silinirken hata:`, error.message);
+      }
     }
     
+    console.log(`✅ ${table} için ilişkili kayıtlar başarıyla silindi`);
     return true;
   } catch (error) {
-    console.error(`İlişkili kayıtları silme hatası (${table}, ${id}):`, error);
-    throw error;
+    console.error(`❌ İlişkili kayıtları silme hatası (${table}, ${id}):`, error);
+    // Hata durumunda da devam et, ana silme işlemini engelleme
+    return false;
   }
 }
 
@@ -864,6 +967,7 @@ for (const table of tables) {
             await client.query('BEGIN');
             
             const { id } = req.params;
+            console.log(`🗑️ Siliniyor: ${table}, ID: ${id}`);
             
             // İlişkili kayıtları sil
             await deleteRelatedRecords(table, id);
@@ -874,14 +978,16 @@ for (const table of tables) {
             
             if (result.rows.length === 0) {
                 await client.query('ROLLBACK');
+                console.log(`❌ Kayıt bulunamadı: ${table}, ID: ${id}`);
                 return res.status(404).json({ error: "Kayıt bulunamadı" });
             }
             
             await client.query('COMMIT');
+            console.log(`✅ Başarıyla silindi: ${table}, ID: ${id}`);
             res.json({ message: "Kayıt başarıyla silindi", deletedRecord: result.rows[0] });
         } catch (error) {
             await client.query('ROLLBACK');
-            console.error(`${table} tablosundan veri silme hatası:`, error);
+            console.error(`❌ ${table} tablosundan veri silme hatası:`, error);
             res.status(500).json({ error: error.message });
         } finally {
             client.release();

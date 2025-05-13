@@ -7,9 +7,12 @@ const bcrypt = require('bcryptjs');
 const app = express();
 app.use(cors({
   origin: '*',  // Geliştirme için - üretime geçerken bu kısıtlanmalıdır
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
 }));
+
+// CORS Preflight kontrolü için OPTIONS yanıtı
+app.options('*', cors());
 app.use(express.json());
 
 // PostgreSQL Bağlantısı
@@ -43,20 +46,33 @@ const normalizeNumber = (value) => {
 
 // Verileri işleyen yardımcı fonksiyon - virgüllü sayıları noktalı formata dönüştürür
 const normalizeData = (data) => {
+  // Null veya undefined değerleri kontrol et
+  if (data === null || data === undefined) {
+    return data;
+  }
+  
+  // Dizi ise her öğeyi işle
   if (Array.isArray(data)) {
     return data.map(item => normalizeData(item));
   }
   
-  if (data && typeof data === 'object') {
+  // Nesne ise her değeri işle
+  if (typeof data === 'object') {
     const normalizedData = {};
     
     for (const [key, value] of Object.entries(data)) {
-      normalizedData[key] = normalizeNumber(value);
+      // Değer bir nesne veya dizi ise içeriğini de işle
+      if (value !== null && typeof value === 'object') {
+        normalizedData[key] = normalizeData(value);
+      } else {
+        normalizedData[key] = normalizeNumber(value);
+      }
     }
     
     return normalizedData;
   }
   
+  // Diğer tüm durumlar için sayı normalizasyonu uygula
   return normalizeNumber(data);
 };
 
@@ -823,29 +839,46 @@ for (const table of tables) {
         try {
             const { id } = req.params;
             
+            // Console log to debug the request
+            console.log(`🔄 PUT Request to ${table}/${id}`);
+            console.log("🧾 Request Body:", JSON.stringify(req.body));
+            
             // Sayı değerlerini normalize et (virgülleri noktalara çevir)
             const data = normalizeData(req.body);
+            
+            // Eğer data boş ise hata döndür
+            if (!data || Object.keys(data).length === 0) {
+                console.error(`❌ ${table} için boş veri (id: ${id})`);
+                return res.status(400).json({ error: "Güncellenecek veri yok" });
+            }
             
             const updates = Object.keys(data).map((key, index) => `${key} = $${index + 1}`).join(', ');
             const values = Object.values(data);
             
-            const query = `UPDATE ${table} SET ${updates} WHERE id = $${values.length + 1} RETURNING *`;
+            const query = `UPDATE ${table} SET ${updates}, updated_at = CURRENT_TIMESTAMP WHERE id = $${values.length + 1} RETURNING *`;
             values.push(id);
             
             console.log(`🔄 Güncelleniyor: ${table}`);
             console.log("🧾 Güncellemeler:", updates);
             console.log("📎 Değerler:", values);
+            console.log("🔍 SQL Query:", query);
             
             const result = await pool.query(query, values);
             if (result.rows.length === 0) {
+                console.error(`❌ Kayıt bulunamadı: ${table} (id: ${id})`);
                 return res.status(404).json({ error: "Kayıt bulunamadı" });
             }
             
+            console.log(`✅ Güncelleme başarılı: ${table} (id: ${id})`);
             // Tutarlı API yanıtı - her zaman tek bir nesne döndür
             res.json(result.rows[0]);
         } catch (error) {
-            console.error(`${table} tablosunda veri güncelleme hatası:`, error);
-            res.status(500).json({ error: error.message });
+            console.error(`❌ ${table} tablosunda veri güncelleme hatası:`, error);
+            res.status(500).json({ 
+                error: error.message,
+                stack: error.stack,
+                details: "Veri güncelleme işlemi sırasında bir hata oluştu."
+            });
         }
     });
 }

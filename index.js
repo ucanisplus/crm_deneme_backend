@@ -13,7 +13,21 @@ app.use(cors({
 
 // CORS Preflight kontrolü için OPTIONS yanıtı
 app.options('*', cors());
-app.use(express.json());
+
+// Increase JSON payload size limit and add better error handling
+app.use(express.json({ limit: '10mb' }));
+
+// JSON parse error handling middleware
+app.use((err, req, res, next) => {
+  if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+    console.error('JSON Parse Error:', err.message);
+    return res.status(400).json({ 
+      error: 'Invalid JSON in request body',
+      details: err.message
+    });
+  }
+  next();
+});
 
 // PostgreSQL Bağlantısı
 const pool = new Pool({
@@ -21,16 +35,30 @@ const pool = new Pool({
     ssl: { rejectUnauthorized: false }
 });
 
-// Sayı formatını düzenleyen yardımcı fonksiyon
+// Database error handling
+pool.on('error', (err) => {
+  console.error('Unexpected database error:', err);
+});
+
+// Sayı formatını düzenleyen yardımcı fonksiyon - İYİLEŞTİRİLMİŞ
 // Virgül yerine nokta kullanarak sayı formatını düzenler
 const normalizeNumber = (value) => {
+  // Null veya undefined değerleri null olarak döndür
+  if (value === null || value === undefined) {
+    return null;
+  }
+  
   if (typeof value === 'number') {
     return value;
   }
   
   if (typeof value === 'string') {
+    // Boş string kontrolü
+    if (value.trim() === '') {
+      return null;
+    }
+    
     // Virgülleri noktalara çevir - global flag ile tüm virgülleri değiştir
-    // Önceki kod sadece ilk virgülü değiştiriyordu
     if (value.includes(',')) {
       return parseFloat(value.replace(/,/g, '.'));
     }
@@ -44,11 +72,11 @@ const normalizeNumber = (value) => {
   return value;
 };
 
-// Verileri işleyen yardımcı fonksiyon - virgüllü sayıları noktalı formata dönüştürür
+// Verileri işleyen yardımcı fonksiyon - virgüllü sayıları noktalı formata dönüştürür - İYİLEŞTİRİLMİŞ
 const normalizeData = (data) => {
   // Null veya undefined değerleri kontrol et
   if (data === null || data === undefined) {
-    return data;
+    return null;
   }
   
   // Dizi ise her öğeyi işle
@@ -61,8 +89,12 @@ const normalizeData = (data) => {
     const normalizedData = {};
     
     for (const [key, value] of Object.entries(data)) {
+      // Boş string kontrolü
+      if (typeof value === 'string' && value.trim() === '') {
+        normalizedData[key] = null;
+      }
       // Değer bir nesne veya dizi ise içeriğini de işle
-      if (value !== null && typeof value === 'object') {
+      else if (value !== null && typeof value === 'object') {
         normalizedData[key] = normalizeData(value);
       } else {
         normalizedData[key] = normalizeNumber(value);
@@ -76,6 +108,23 @@ const normalizeData = (data) => {
   return normalizeNumber(data);
 };
 
+// Veri doğrulama fonksiyonu - YENİ
+const validateData = (data) => {
+  if (!data) {
+    return { valid: false, error: 'Veri boş olamaz' };
+  }
+  
+  if (typeof data !== 'object' || (Array.isArray(data) && data.length === 0)) {
+    return { valid: false, error: 'Geçersiz veri formatı' };
+  }
+  
+  if (!Array.isArray(data) && Object.keys(data).length === 0) {
+    return { valid: false, error: 'Boş nesne gönderilemez' };
+  }
+  
+  return { valid: true };
+};
+
 // Test Rotası
 app.get('/api/test', async (req, res) => {
     try {
@@ -83,7 +132,10 @@ app.get('/api/test', async (req, res) => {
         res.json({ message: "Veritabanı Bağlandı!", timestamp: result.rows[0].now });
     } catch (error) {
         console.error("Veritabanı Bağlantı Hatası:", error);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ 
+          error: "Veritabanı bağlantısı başarısız", 
+          details: error.message 
+        });
     }
 });
 
@@ -546,7 +598,6 @@ async function checkAndCreateTable(tableName) {
             cevrim_payda_2 INT,
             cevrim_degeri_2 NUMERIC(10, 4),
             cap NUMERIC(10, 4),
-            kod_2 VARCHAR(50),
             kaplama INT,
             min_mukavemet INT,
             max_mukavemet INT,
@@ -692,7 +743,11 @@ for (const table of tables) {
             res.json(result.rows);
         } catch (error) {
             console.error(`${table} tablosundan veri getirme hatası:`, error);
-            res.status(500).json({ error: error.message });
+            res.status(500).json({ 
+              error: `${table} tablosundan veri getirme başarısız`,
+              details: error.message,
+              code: error.code
+            });
         }
     });
 }
@@ -779,6 +834,13 @@ for (const table of tables) {
         try {
             let data = req.body;
             
+            // Veri doğrulama
+            const validation = validateData(data);
+            if (!validation.valid) {
+              console.error(`❌ ${table} için veri doğrulama hatası:`, validation.error);
+              return res.status(400).json({ error: validation.error });
+            }
+            
             // Gelen veri bir dizi mi kontrol et
             if (Array.isArray(data)) {
                 console.log(`📥 ${table} tablosuna dizi veri ekleniyor (${data.length} öğe)`);
@@ -787,27 +849,46 @@ for (const table of tables) {
                 const results = [];
                 
                 for (const item of data) {
-                    // Sayı değerlerini normalize et (virgülleri noktalara çevir)
-                    const normalizedItem = normalizeData(item);
-                    
-                    const columns = Object.keys(normalizedItem).join(', ');
-                    const placeholders = Object.keys(normalizedItem).map((_, index) => `$${index + 1}`).join(', ');
-                    const values = Object.values(normalizedItem);
-                    
-                    const query = `INSERT INTO ${table} (${columns}) VALUES (${placeholders}) RETURNING *`;
-                    
-                    console.log(`📥 Ekleniyor: ${table} (dizi öğesi)`);
-                    console.log("🧾 Sütunlar:", columns);
-                    console.log("📎 Değerler:", values);
-                    
-                    const result = await pool.query(query, values);
-                    results.push(result.rows[0]);
+                    try {
+                      // Sayı değerlerini normalize et (virgülleri noktalara çevir)
+                      const normalizedItem = normalizeData(item);
+                      
+                      // Boş değilse devam et
+                      if (!normalizedItem || Object.keys(normalizedItem).length === 0) {
+                        console.warn(`⚠️ Boş öğe atlanıyor:`, item);
+                        continue;
+                      }
+                      
+                      const columns = Object.keys(normalizedItem).join(', ');
+                      const placeholders = Object.keys(normalizedItem).map((_, index) => `$${index + 1}`).join(', ');
+                      const values = Object.values(normalizedItem);
+                      
+                      const query = `INSERT INTO ${table} (${columns}) VALUES (${placeholders}) RETURNING *`;
+                      
+                      console.log(`📥 Ekleniyor: ${table} (dizi öğesi)`);
+                      
+                      const result = await pool.query(query, values);
+                      results.push(result.rows[0]);
+                    } catch (itemError) {
+                      console.error(`❌ Öğe ekleme hatası:`, itemError);
+                      // Hata olduğunda diğer öğeleri etkilememek için devam et
+                      results.push({ error: itemError.message, item });
+                    }
+                }
+                
+                if (results.length === 0) {
+                  return res.status(400).json({ error: 'Hiçbir geçerli öğe eklenemedi' });
                 }
                 
                 res.status(201).json(results);
             } else {
                 // Sayı değerlerini normalize et (virgülleri noktalara çevir)
                 data = normalizeData(data);
+                
+                // Veri onaylandıktan sonra boş olabilir mi kontrol et
+                if (!data || Object.keys(data).length === 0) {
+                  return res.status(400).json({ error: 'Normalleştirmeden sonra boş veri kaldı' });
+                }
                 
                 const columns = Object.keys(data).join(', ');
                 const placeholders = Object.keys(data).map((_, index) => `$${index + 1}`).join(', ');
@@ -817,7 +898,6 @@ for (const table of tables) {
                 
                 console.log(`📥 Ekleniyor: ${table}`);
                 console.log("🧾 Sütunlar:", columns);
-                console.log("📎 Değerler:", values);
                 
                 const result = await pool.query(query, values);
                 res.status(201).json(result.rows[0]);
@@ -825,9 +905,33 @@ for (const table of tables) {
         } catch (error) {
             console.error(`❌ '${table}' tablosuna ekleme başarısız:`, error);
             console.error("🧾 Veri:", req.body);
+            
+            // Daha detaylı hata yanıtları
+            if (error.code === '23505') {
+              return res.status(409).json({ 
+                error: 'Aynı kayıt zaten var',
+                details: error.detail || error.message,
+                code: error.code
+              });
+            } else if (error.code === '22P02') {
+              return res.status(400).json({ 
+                error: 'Geçersiz veri tipi',
+                details: error.message,
+                code: error.code
+              });
+            } else if (error.code === '23502') {
+              return res.status(400).json({ 
+                error: 'Zorunlu alan eksik',
+                details: error.message,
+                code: error.code
+              });
+            }
+            
             res.status(500).json({ 
-                error: error.message,
-                stack: error.stack,
+                error: `${table} tablosuna veri eklenemedi`,
+                details: error.message,
+                code: error.code,
+                stack: error.stack
             });
         }
     });
@@ -842,6 +946,13 @@ for (const table of tables) {
             // Console log to debug the request
             console.log(`🔄 PUT Request to ${table}/${id}`);
             console.log("🧾 Request Body:", JSON.stringify(req.body));
+            
+            // Veri doğrulama
+            const validation = validateData(req.body);
+            if (!validation.valid) {
+              console.error(`❌ ${table} için veri doğrulama hatası:`, validation.error);
+              return res.status(400).json({ error: validation.error });
+            }
             
             // Sayı değerlerini normalize et (virgülleri noktalara çevir)
             const data = normalizeData(req.body);
@@ -860,7 +971,6 @@ for (const table of tables) {
             
             console.log(`🔄 Güncelleniyor: ${table}`);
             console.log("🧾 Güncellemeler:", updates);
-            console.log("📎 Değerler:", values);
             console.log("🔍 SQL Query:", query);
             
             const result = await pool.query(query, values);
@@ -874,10 +984,27 @@ for (const table of tables) {
             res.json(result.rows[0]);
         } catch (error) {
             console.error(`❌ ${table} tablosunda veri güncelleme hatası:`, error);
+            
+            // Daha detaylı hata yanıtları
+            if (error.code === '23505') {
+              return res.status(409).json({ 
+                error: 'Aynı kayıt zaten var',
+                details: error.detail || error.message,
+                code: error.code
+              });
+            } else if (error.code === '22P02') {
+              return res.status(400).json({ 
+                error: 'Geçersiz veri tipi',
+                details: error.message,
+                code: error.code
+              });
+            }
+            
             res.status(500).json({ 
-                error: error.message,
-                stack: error.stack,
-                details: "Veri güncelleme işlemi sırasında bir hata oluştu."
+                error: `${table} tablosunda veri güncellenemedi`,
+                details: error.message,
+                code: error.code,
+                stack: error.stack
             });
         }
     });
@@ -1027,6 +1154,47 @@ for (const table of tables) {
         }
     });
 }
+
+// Veritabanı şeması hakkında bilgi almak için özel endpoint - YENİ
+app.get('/api/debug/table/:table', async (req, res) => {
+  try {
+    const { table } = req.params;
+    
+    // Tablo adını doğrula (SQL injection önleme)
+    if (!tables.includes(table)) {
+      return res.status(400).json({ error: 'Geçersiz tablo adı' });
+    }
+    
+    // Tablo yapısını al
+    const query = `
+      SELECT 
+        column_name, 
+        data_type, 
+        is_nullable,
+        column_default
+      FROM 
+        information_schema.columns
+      WHERE 
+        table_name = $1
+      ORDER BY 
+        ordinal_position;
+    `;
+    
+    const result = await pool.query(query, [table]);
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Tablo bulunamadı' });
+    }
+    
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Tablo şeması alma hatası:', error);
+    res.status(500).json({ 
+      error: 'Tablo şeması alınamadı',
+      details: error.message
+    });
+  }
+});
 
 // Sıralı numara almak için endpoint
 app.get('/api/gal_cost_cal_sequence/next', async (req, res) => {

@@ -125,6 +125,112 @@ const validateData = (data) => {
   return { valid: true };
 };
 
+// *************** YENİ EKLENEN TIMESTAMP FIX FONKSİYONU *************** //
+/**
+ * Fixes timestamp format issues like "2025" to proper PostgreSQL timestamps
+ * @param {Object} data - Request data to sanitize
+ * @returns {Object} - Sanitized data
+ */
+function sanitizeTimestamps(data) {
+  // Handle null/undefined
+  if (!data) return data;
+  
+  // Handle arrays
+  if (Array.isArray(data)) {
+    return data.map(item => sanitizeTimestamps(item));
+  }
+  
+  // Handle objects
+  if (typeof data === 'object' && data !== null) {
+    const result = {...data};
+    
+    for (const [key, value] of Object.entries(data)) {
+      // Identify timestamp fields by naming convention
+      if (key.endsWith('_at') || key.includes('_tarihi') || key.includes('_update') || key.includes('Date')) {
+        if (value === null || value === undefined || value === '') {
+          // Null values stay null
+          result[key] = null;
+        } else if (typeof value === 'string' && /^\d{4}$/.test(value)) {
+          // Fix year-only values like "2025" by converting to proper timestamp
+          const year = parseInt(value);
+          if (year >= 1900 && year <= 2100) {
+            result[key] = `${year}-01-01 00:00:00`;
+            console.log(`🕒 Timestamp field "${key}" with value "${value}" converted to "${result[key]}"`);
+          } else {
+            result[key] = null;
+          }
+        } else if (typeof value === 'string' && value.trim() === '') {
+          // Empty strings become null
+          result[key] = null;
+        } else if (typeof value === 'string') {
+          // Try to fix other timestamp strings
+          try {
+            // Check if it's already in PostgreSQL format
+            if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(value)) {
+              result[key] = value;
+            } else {
+              // Try to parse and convert to PostgreSQL format
+              const date = new Date(value);
+              if (!isNaN(date.getTime())) {
+                // Format: YYYY-MM-DD HH:MM:SS
+                const timestamp = date.toISOString().replace('T', ' ').split('.')[0];
+                result[key] = timestamp;
+                console.log(`🕒 Timestamp field "${key}" with value "${value}" converted to "${timestamp}"`);
+              } else {
+                result[key] = null;
+              }
+            }
+          } catch (e) {
+            // If parsing fails, set to null
+            result[key] = null;
+          }
+        } else if (value instanceof Date) {
+          // Convert Date objects to proper format
+          result[key] = value.toISOString().replace('T', ' ').split('.')[0];
+        } else {
+          // Any other type becomes null
+          result[key] = null;
+        }
+      } else if (typeof value === 'object' && value !== null) {
+        // Process nested objects
+        result[key] = sanitizeTimestamps(value);
+      }
+    }
+    
+    return result;
+  }
+  
+  // Return primitive values unchanged
+  return data;
+}
+
+// Middleware to fix timestamps in all requests - YENİ EKLENEN
+app.use((req, res, next) => {
+  if (req.body && (req.method === 'POST' || req.method === 'PUT')) {
+    try {
+      // Apply timestamp fixes to all POST/PUT requests
+      const originalBody = {...req.body};
+      req.body = sanitizeTimestamps(req.body);
+      
+      console.log('🕒 Timestamp sanitization applied to request');
+      
+      // Log specific timestamp fields for debugging
+      if (typeof req.body === 'object' && req.body !== null) {
+        Object.entries(req.body).forEach(([key, value]) => {
+          if ((key.includes('_tarihi') || key.includes('_update') || key.endsWith('_at')) && 
+              originalBody[key] !== value) {
+            console.log(`🕒 Fixed timestamp field: ${key}: ${originalBody[key]} => ${value}`);
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Error sanitizing timestamps:', error);
+      // Continue even if sanitization fails
+    }
+  }
+  next();
+});
+
 // Test Rotası
 app.get('/api/test', async (req, res) => {
     try {

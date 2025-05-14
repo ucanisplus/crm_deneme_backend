@@ -1,3 +1,4 @@
+// COMPLETE FIXED VERSION OF INDEX.JS WITH TIMESTAMP ISSUE RESOLVED
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
@@ -39,6 +40,57 @@ const pool = new Pool({
 pool.on('error', (err) => {
   console.error('Unexpected database error:', err);
 });
+
+// ***************** CRITICAL FIX: OVERRIDE POOL.QUERY *****************
+// This intercepts all database queries before they are executed
+const originalQuery = pool.query;
+pool.query = function(text, params) {
+  try {
+    // Check if this is an operation related to the problematic tables
+    const isProfilDegiskenler = text.includes('panel_cost_cal_profil_degiskenler');
+    const isPanelList = text.includes('panel_cost_cal_panel_list');
+    
+    if ((isProfilDegiskenlers || isPanelList) && params && params.length > 0) {
+      // Intercept and fix problematic parameters
+      const fixedParams = params.map(param => {
+        // Fix "2025" string directly
+        if (param === "2025") {
+          console.log(`🔧 CRITICAL FIX: Replaced "2025" with "2025-01-01 00:00:00" in database query`);
+          return "2025-01-01 00:00:00";
+        }
+        
+        // Also check for objects with timestamp fields
+        if (param && typeof param === 'object') {
+          // Clone the object to avoid modifying the original
+          const fixedParam = {...param};
+          
+          // Fix known problematic fields
+          if (fixedParam.profil_latest_update === "2025") {
+            console.log(`🔧 CRITICAL FIX: Replaced profil_latest_update from "2025" to "2025-01-01 00:00:00"`);
+            fixedParam.profil_latest_update = "2025-01-01 00:00:00";
+          }
+          
+          if (fixedParam.kayit_tarihi === "2025") {
+            console.log(`🔧 CRITICAL FIX: Replaced kayit_tarihi from "2025" to "2025-01-01 00:00:00"`);
+            fixedParam.kayit_tarihi = "2025-01-01 00:00:00";
+          }
+          
+          return fixedParam;
+        }
+        
+        return param;
+      });
+      
+      // Call the original query with fixed parameters
+      return originalQuery.call(this, text, fixedParams);
+    }
+  } catch (error) {
+    console.error('Error in query interceptor:', error);
+  }
+  
+  // Default: call original query method
+  return originalQuery.call(this, text, params);
+};
 
 // Sayı formatını düzenleyen yardımcı fonksiyon - İYİLEŞTİRİLMİŞ
 // Virgül yerine nokta kullanarak sayı formatını düzenler
@@ -89,6 +141,25 @@ const normalizeData = (data) => {
     const normalizedData = {};
     
     for (const [key, value] of Object.entries(data)) {
+      // DIRECT FIX FOR TIMESTAMP FIELDS - MOST CRITICAL PART
+      if ((key === 'profil_latest_update' || key === 'kayit_tarihi') && value === '2025') {
+        normalizedData[key] = '2025-01-01 00:00:00';
+        console.log(`🔧 normalizeData: Fixed ${key} from "2025" to "2025-01-01 00:00:00"`);
+        continue;
+      }
+      
+      // GENERAL FIX FOR ALL TIMESTAMP FIELDS
+      if ((key.includes('_update') || key.includes('_tarihi') || key.endsWith('_at')) && 
+          typeof value === 'string' && /^\d{4}$/.test(value)) {
+        // Convert year values (e.g. "2025") to PostgreSQL timestamp format
+        const year = parseInt(value);
+        if (year >= 1900 && year <= 2100) {
+          normalizedData[key] = `${year}-01-01 00:00:00`;
+          console.log(`🔧 normalizeData: Fixed timestamp field ${key} from "${value}" to "${normalizedData[key]}"`);
+          continue;
+        }
+      }
+      
       // Boş string kontrolü
       if (typeof value === 'string' && value.trim() === '') {
         normalizedData[key] = null;
@@ -940,6 +1011,20 @@ for (const table of tables) {
         try {
             let data = req.body;
             
+            // DIRECT FIX FOR "2025" TIMESTAMP ERROR - Check for the specific problematic timestamp field
+            if (table === 'panel_cost_cal_profil_degiskenler' && data.profil_latest_update === '2025') {
+                // Hard-code the correct PostgreSQL timestamp
+                data.profil_latest_update = '2025-01-01 00:00:00';
+                console.log('🔨 DIRECT FIX: Changed profil_latest_update from "2025" to "2025-01-01 00:00:00"');
+            }
+            
+            // DIRECT FIX FOR PANEL LIST
+            if (table === 'panel_cost_cal_panel_list' && data.kayit_tarihi === '2025') {
+                // Hard-code the correct PostgreSQL timestamp
+                data.kayit_tarihi = '2025-01-01 00:00:00';
+                console.log('🔨 DIRECT FIX: Changed kayit_tarihi from "2025" to "2025-01-01 00:00:00"');
+            }
+            
             // Veri doğrulama
             const validation = validateData(data);
             if (!validation.valid) {
@@ -956,6 +1041,17 @@ for (const table of tables) {
                 
                 for (const item of data) {
                     try {
+                      // DIRECT FIX FOR "2025" TIMESTAMP ERROR - Each item in array
+                      if (table === 'panel_cost_cal_profil_degiskenler' && item.profil_latest_update === '2025') {
+                        item.profil_latest_update = '2025-01-01 00:00:00';
+                        console.log('🔨 DIRECT FIX (array item): Changed profil_latest_update from "2025" to "2025-01-01 00:00:00"');
+                      }
+                      
+                      if (table === 'panel_cost_cal_panel_list' && item.kayit_tarihi === '2025') {
+                        item.kayit_tarihi = '2025-01-01 00:00:00';
+                        console.log('🔨 DIRECT FIX (array item): Changed kayit_tarihi from "2025" to "2025-01-01 00:00:00"');
+                      }
+                    
                       // Sayı değerlerini normalize et (virgülleri noktalara çevir)
                       const normalizedItem = normalizeData(item);
                       

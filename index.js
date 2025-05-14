@@ -30,6 +30,50 @@ app.use((err, req, res, next) => {
   next();
 });
 
+// Special timestamp fix middleware
+app.use((req, res, next) => {
+  if ((req.method === 'POST' || req.method === 'PUT') && req.body) {
+    console.log('🔎 Timestamp fix middleware processing request...');
+    
+    // Function to recursively fix timestamps in objects
+    const fixTimestamps = (obj) => {
+      if (!obj || typeof obj !== 'object') return obj;
+      
+      // Handle arrays
+      if (Array.isArray(obj)) {
+        return obj.map(item => fixTimestamps(item));
+      }
+      
+      // Handle objects
+      const fixed = {...obj};
+      
+      Object.entries(fixed).forEach(([key, value]) => {
+        // Identify timestamp fields
+        if (key.includes('_update') || key.includes('_tarihi') || key.endsWith('_at') || key.includes('Date')) {
+          if (value === "2025" || value === 2025) {
+            // Replace problematic "2025" value with properly formatted timestamp
+            fixed[key] = "2025-01-01 00:00:00+00";
+            console.log(`🔧 Fixed timestamp field "${key}" from "${value}" to ISO format`);
+          } else if (typeof value === 'string' && value.includes('T') && value.includes('Z')) {
+            // Convert ISO format to PostgreSQL format
+            fixed[key] = value.replace('T', ' ').replace('Z', '+00');
+          }
+        } else if (value && typeof value === 'object') {
+          // Recursively process nested objects/arrays
+          fixed[key] = fixTimestamps(value);
+        }
+      });
+      
+      return fixed;
+    };
+    
+    // Fix timestamps in the request body
+    req.body = fixTimestamps(req.body);
+  }
+  
+  next();
+});
+
 // PostgreSQL Bağlantısı
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,

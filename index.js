@@ -30,45 +30,66 @@ app.use((err, req, res, next) => {
   next();
 });
 
-// Special timestamp fix middleware
+// EMERGENCY DIRECT FIX for timestamp issues
 app.use((req, res, next) => {
   if ((req.method === 'POST' || req.method === 'PUT') && req.body) {
-    console.log('🔎 Timestamp fix middleware processing request...');
+    console.log('⚠️ EMERGENCY TIMESTAMP FIX for request to:', req.url);
+    console.log('📝 ORIGINAL BODY:', JSON.stringify(req.body).substring(0, 200) + '...');
     
-    // Function to recursively fix timestamps in objects
-    const fixTimestamps = (obj) => {
-      if (!obj || typeof obj !== 'object') return obj;
+    // Direct fix for all special fields recursively
+    const directFix = (obj) => {
+      // Skip null/undefined values
+      if (!obj) return obj;
+      
+      // For non-objects, return as is
+      if (typeof obj !== 'object') return obj;
       
       // Handle arrays
       if (Array.isArray(obj)) {
-        return obj.map(item => fixTimestamps(item));
+        return obj.map(item => directFix(item));
       }
       
-      // Handle objects
-      const fixed = {...obj};
+      // Fix objects by copying and processing each property
+      const result = {...obj};
       
-      Object.entries(fixed).forEach(([key, value]) => {
-        // Identify timestamp fields
-        if (key.includes('_update') || key.includes('_tarihi') || key.endsWith('_at') || key.includes('Date')) {
+      // First pass - identify and fix critical fields
+      for (const [key, value] of Object.entries(result)) {
+        // Handle timestamp fields 
+        if ((key.includes('_update') || key.includes('_tarihi') || key.endsWith('_at') || key.includes('Date'))) {
+          // CRITICAL FIX: Handle 2025 year-only value that causes errors
           if (value === "2025" || value === 2025) {
-            // Replace problematic "2025" value with properly formatted timestamp
-            fixed[key] = "2025-01-01 00:00:00+00";
-            console.log(`🔧 Fixed timestamp field "${key}" from "${value}" to ISO format`);
-          } else if (typeof value === 'string' && value.includes('T') && value.includes('Z')) {
-            // Convert ISO format to PostgreSQL format
-            fixed[key] = value.replace('T', ' ').replace('Z', '+00');
+            // Use PostgreSQL timestamptz compatible format
+            result[key] = "2025-01-01 00:00:00+00";
+            console.log(`✅ FIXED CRITICAL VALUE: Changed "${key}" from "${value}" to "${result[key]}"`);
           }
-        } else if (value && typeof value === 'object') {
-          // Recursively process nested objects/arrays
-          fixed[key] = fixTimestamps(value);
+          // Handle other simple year values
+          else if (typeof value === 'string' && /^\d{4}$/.test(value)) {
+            // Parse year and validate range
+            const year = parseInt(value);
+            if (year >= 1900 && year <= 2100) {
+              result[key] = `${year}-01-01 00:00:00+00`;
+              console.log(`✅ FIXED YEAR VALUE: Changed "${key}" from "${value}" to "${result[key]}"`);
+            }
+          }
+          // Handle ISO format timestamps with T and Z markers
+          else if (typeof value === 'string' && value.includes('T') && value.includes('Z')) {
+            // Convert to PostgreSQL format with explicit timezone
+            result[key] = value.replace('T', ' ').replace('Z', '+00');
+            console.log(`✅ CONVERTED ISO FORMAT: "${key}" to "${result[key]}"`);
+          }
         }
-      });
+        // Recursively fix nested objects and arrays
+        else if (value && typeof value === 'object') {
+          result[key] = directFix(value);
+        }
+      }
       
-      return fixed;
+      return result;
     };
     
-    // Fix timestamps in the request body
-    req.body = fixTimestamps(req.body);
+    // Apply the fix to the request body
+    req.body = directFix(req.body);
+    console.log('📝 FIXED BODY:', JSON.stringify(req.body).substring(0, 200) + '...');
   }
   
   next();

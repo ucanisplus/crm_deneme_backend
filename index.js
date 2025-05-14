@@ -41,57 +41,6 @@ pool.on('error', (err) => {
   console.error('Unexpected database error:', err);
 });
 
-// ***************** CRITICAL FIX: OVERRIDE POOL.QUERY *****************
-// This intercepts all database queries before they are executed
-const originalQuery = pool.query;
-pool.query = function(text, params) {
-  try {
-    // Check if this is an operation related to the problematic tables
-    const isProfilDegiskenler = text.includes('panel_cost_cal_profil_degiskenler');
-    const isPanelList = text.includes('panel_cost_cal_panel_list');
-    
-    if ((isProfilDegiskenlers || isPanelList) && params && params.length > 0) {
-      // Intercept and fix problematic parameters
-      const fixedParams = params.map(param => {
-        // Fix "2025" string directly
-        if (param === "2025") {
-          console.log(`🔧 CRITICAL FIX: Replaced "2025" with "2025-01-01 00:00:00" in database query`);
-          return "2025-01-01 00:00:00";
-        }
-        
-        // Also check for objects with timestamp fields
-        if (param && typeof param === 'object') {
-          // Clone the object to avoid modifying the original
-          const fixedParam = {...param};
-          
-          // Fix known problematic fields
-          if (fixedParam.profil_latest_update === "2025") {
-            console.log(`🔧 CRITICAL FIX: Replaced profil_latest_update from "2025" to "2025-01-01 00:00:00"`);
-            fixedParam.profil_latest_update = "2025-01-01 00:00:00";
-          }
-          
-          if (fixedParam.kayit_tarihi === "2025") {
-            console.log(`🔧 CRITICAL FIX: Replaced kayit_tarihi from "2025" to "2025-01-01 00:00:00"`);
-            fixedParam.kayit_tarihi = "2025-01-01 00:00:00";
-          }
-          
-          return fixedParam;
-        }
-        
-        return param;
-      });
-      
-      // Call the original query with fixed parameters
-      return originalQuery.call(this, text, fixedParams);
-    }
-  } catch (error) {
-    console.error('Error in query interceptor:', error);
-  }
-  
-  // Default: call original query method
-  return originalQuery.call(this, text, params);
-};
-
 // Sayı formatını düzenleyen yardımcı fonksiyon - İYİLEŞTİRİLMİŞ
 // Virgül yerine nokta kullanarak sayı formatını düzenler
 const normalizeNumber = (value) => {
@@ -141,25 +90,6 @@ const normalizeData = (data) => {
     const normalizedData = {};
     
     for (const [key, value] of Object.entries(data)) {
-      // DIRECT FIX FOR TIMESTAMP FIELDS - MOST CRITICAL PART
-      if ((key === 'profil_latest_update' || key === 'kayit_tarihi') && value === '2025') {
-        normalizedData[key] = '2025-01-01 00:00:00';
-        console.log(`🔧 normalizeData: Fixed ${key} from "2025" to "2025-01-01 00:00:00"`);
-        continue;
-      }
-      
-      // GENERAL FIX FOR ALL TIMESTAMP FIELDS
-      if ((key.includes('_update') || key.includes('_tarihi') || key.endsWith('_at')) && 
-          typeof value === 'string' && /^\d{4}$/.test(value)) {
-        // Convert year values (e.g. "2025") to PostgreSQL timestamp format
-        const year = parseInt(value);
-        if (year >= 1900 && year <= 2100) {
-          normalizedData[key] = `${year}-01-01 00:00:00`;
-          console.log(`🔧 normalizeData: Fixed timestamp field ${key} from "${value}" to "${normalizedData[key]}"`);
-          continue;
-        }
-      }
-      
       // Boş string kontrolü
       if (typeof value === 'string' && value.trim() === '') {
         normalizedData[key] = null;
@@ -195,112 +125,6 @@ const validateData = (data) => {
   
   return { valid: true };
 };
-
-// *************** YENİ EKLENEN TIMESTAMP FIX FONKSİYONU *************** //
-/**
- * Fixes timestamp format issues like "2025" to proper PostgreSQL timestamps
- * @param {Object} data - Request data to sanitize
- * @returns {Object} - Sanitized data
- */
-function sanitizeTimestamps(data) {
-  // Handle null/undefined
-  if (!data) return data;
-  
-  // Handle arrays
-  if (Array.isArray(data)) {
-    return data.map(item => sanitizeTimestamps(item));
-  }
-  
-  // Handle objects
-  if (typeof data === 'object' && data !== null) {
-    const result = {...data};
-    
-    for (const [key, value] of Object.entries(data)) {
-      // Identify timestamp fields by naming convention
-      if (key.endsWith('_at') || key.includes('_tarihi') || key.includes('_update') || key.includes('Date')) {
-        if (value === null || value === undefined || value === '') {
-          // Null values stay null
-          result[key] = null;
-        } else if (typeof value === 'string' && /^\d{4}$/.test(value)) {
-          // Fix year-only values like "2025" by converting to proper timestamp
-          const year = parseInt(value);
-          if (year >= 1900 && year <= 2100) {
-            result[key] = `${year}-01-01 00:00:00`;
-            console.log(`🕒 Timestamp field "${key}" with value "${value}" converted to "${result[key]}"`);
-          } else {
-            result[key] = null;
-          }
-        } else if (typeof value === 'string' && value.trim() === '') {
-          // Empty strings become null
-          result[key] = null;
-        } else if (typeof value === 'string') {
-          // Try to fix other timestamp strings
-          try {
-            // Check if it's already in PostgreSQL format
-            if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(value)) {
-              result[key] = value;
-            } else {
-              // Try to parse and convert to PostgreSQL format
-              const date = new Date(value);
-              if (!isNaN(date.getTime())) {
-                // Format: YYYY-MM-DD HH:MM:SS
-                const timestamp = date.toISOString().replace('T', ' ').split('.')[0];
-                result[key] = timestamp;
-                console.log(`🕒 Timestamp field "${key}" with value "${value}" converted to "${timestamp}"`);
-              } else {
-                result[key] = null;
-              }
-            }
-          } catch (e) {
-            // If parsing fails, set to null
-            result[key] = null;
-          }
-        } else if (value instanceof Date) {
-          // Convert Date objects to proper format
-          result[key] = value.toISOString().replace('T', ' ').split('.')[0];
-        } else {
-          // Any other type becomes null
-          result[key] = null;
-        }
-      } else if (typeof value === 'object' && value !== null) {
-        // Process nested objects
-        result[key] = sanitizeTimestamps(value);
-      }
-    }
-    
-    return result;
-  }
-  
-  // Return primitive values unchanged
-  return data;
-}
-
-// Middleware to fix timestamps in all requests - YENİ EKLENEN
-app.use((req, res, next) => {
-  if (req.body && (req.method === 'POST' || req.method === 'PUT')) {
-    try {
-      // Apply timestamp fixes to all POST/PUT requests
-      const originalBody = {...req.body};
-      req.body = sanitizeTimestamps(req.body);
-      
-      console.log('🕒 Timestamp sanitization applied to request');
-      
-      // Log specific timestamp fields for debugging
-      if (typeof req.body === 'object' && req.body !== null) {
-        Object.entries(req.body).forEach(([key, value]) => {
-          if ((key.includes('_tarihi') || key.includes('_update') || key.endsWith('_at')) && 
-              originalBody[key] !== value) {
-            console.log(`🕒 Fixed timestamp field: ${key}: ${originalBody[key]} => ${value}`);
-          }
-        });
-      }
-    } catch (error) {
-      console.error('Error sanitizing timestamps:', error);
-      // Continue even if sanitization fails
-    }
-  }
-  next();
-});
 
 // Test Rotası
 app.get('/api/test', async (req, res) => {
@@ -752,7 +576,7 @@ async function checkAndCreateTable(tableName) {
           )
         `;
       } else {
-        // Genel tablolar
+        // Genel tablolar - tüm tablolarda TIMESTAMP WITH TIME ZONE kullanıyoruz
         createTableQuery = `
           CREATE TABLE ${tableName} (
             id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -809,6 +633,44 @@ async function checkAndCreateTable(tableName) {
       
       await pool.query(createTableQuery);
       console.log(`Tablo '${tableName}' başarıyla oluşturuldu.`);
+    } else {
+      // Panel Çit tabloları için timestamp kontrolü yapıp timestamptz'ye güncelleme
+      if (tableName.includes('panel_cit')) {
+        // Check if we need to alter the timestamp columns
+        const timestampColCheck = await pool.query(`
+          SELECT data_type, column_name 
+          FROM information_schema.columns 
+          WHERE table_name = $1 
+          AND (column_name = 'created_at' OR column_name = 'updated_at' OR column_name LIKE '%_tarihi%' OR column_name LIKE '%_date%')
+          AND data_type = 'timestamp without time zone'
+        `, [tableName]);
+        
+        // If there are timestamp columns without timezone, alter them
+        if (timestampColCheck.rows.length > 0) {
+          console.log(`⚠️ ${tableName} tablosunda timezone olmayan tarih alanları bulundu. Güncelleniyor...`);
+          
+          // Alter each column using a transaction
+          await pool.query('BEGIN');
+          try {
+            for (const row of timestampColCheck.rows) {
+              console.log(`🔄 ${row.column_name} alanı güncelleniyor...`);
+              
+              await pool.query(`
+                ALTER TABLE ${tableName} 
+                ALTER COLUMN ${row.column_name} TYPE TIMESTAMP WITH TIME ZONE
+              `);
+              
+              console.log(`✅ ${row.column_name} alanı başarıyla güncellendi.`);
+            }
+            
+            await pool.query('COMMIT');
+            console.log(`✅ ${tableName} tablosundaki tüm tarih alanları TIMESTAMP WITH TIME ZONE tipine güncellendi.`);
+          } catch (error) {
+            await pool.query('ROLLBACK');
+            console.error(`❌ ${tableName} tablosundaki tarih alanları güncellenirken hata oluştu:`, error);
+          }
+        }
+      }
     }
   } catch (error) {
     console.error(`Tablo kontrol/oluşturma hatası (${tableName}):`, error);
@@ -823,7 +685,7 @@ async function checkAllTables() {
     for (const tableName of tables) {
       await checkAndCreateTable(tableName);
     }
-    console.log("Tüm tablolar kontrol edildi ve gerekirse oluşturuldu.");
+    console.log("Tüm tablolar kontrol edildi ve gerekirse oluşturuldu/güncellendi.");
   } catch (error) {
     console.error("Tablo kontrol hatası:", error);
   }
@@ -1011,20 +873,6 @@ for (const table of tables) {
         try {
             let data = req.body;
             
-            // DIRECT FIX FOR "2025" TIMESTAMP ERROR - Check for the specific problematic timestamp field
-            if (table === 'panel_cost_cal_profil_degiskenler' && data.profil_latest_update === '2025') {
-                // Hard-code the correct PostgreSQL timestamp
-                data.profil_latest_update = '2025-01-01 00:00:00';
-                console.log('🔨 DIRECT FIX: Changed profil_latest_update from "2025" to "2025-01-01 00:00:00"');
-            }
-            
-            // DIRECT FIX FOR PANEL LIST
-            if (table === 'panel_cost_cal_panel_list' && data.kayit_tarihi === '2025') {
-                // Hard-code the correct PostgreSQL timestamp
-                data.kayit_tarihi = '2025-01-01 00:00:00';
-                console.log('🔨 DIRECT FIX: Changed kayit_tarihi from "2025" to "2025-01-01 00:00:00"');
-            }
-            
             // Veri doğrulama
             const validation = validateData(data);
             if (!validation.valid) {
@@ -1041,17 +889,6 @@ for (const table of tables) {
                 
                 for (const item of data) {
                     try {
-                      // DIRECT FIX FOR "2025" TIMESTAMP ERROR - Each item in array
-                      if (table === 'panel_cost_cal_profil_degiskenler' && item.profil_latest_update === '2025') {
-                        item.profil_latest_update = '2025-01-01 00:00:00';
-                        console.log('🔨 DIRECT FIX (array item): Changed profil_latest_update from "2025" to "2025-01-01 00:00:00"');
-                      }
-                      
-                      if (table === 'panel_cost_cal_panel_list' && item.kayit_tarihi === '2025') {
-                        item.kayit_tarihi = '2025-01-01 00:00:00';
-                        console.log('🔨 DIRECT FIX (array item): Changed kayit_tarihi from "2025" to "2025-01-01 00:00:00"');
-                      }
-                    
                       // Sayı değerlerini normalize et (virgülleri noktalara çevir)
                       const normalizedItem = normalizeData(item);
                       
@@ -1157,7 +994,7 @@ for (const table of tables) {
             }
             
             // Sayı değerlerini normalize et (virgülleri noktalara çevir)
-            const data = normalizeData(req.body);
+            let data = normalizeData(req.body);
             
             // Eğer data boş ise hata döndür
             if (!data || Object.keys(data).length === 0) {
@@ -1357,7 +1194,7 @@ for (const table of tables) {
     });
 }
 
-// Veritabanı şeması hakkında bilgi almak için özel endpoint - YENİ
+// Veritabanı şeması hakkında bilgi almak için özel endpoint
 app.get('/api/debug/table/:table', async (req, res) => {
   try {
     const { table } = req.params;
@@ -1395,6 +1232,72 @@ app.get('/api/debug/table/:table', async (req, res) => {
       error: 'Tablo şeması alınamadı',
       details: error.message
     });
+  }
+});
+
+// Tüm timestamp alanlarını timestamptz'ye çeviren admin endpoint'i
+app.post('/api/admin/update-timestamp-columns', async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    
+    // Büyütülenecek tablolar (sadece belirtilen tablolar değil, veritabanındaki tüm tablolar)
+    const tablesResult = await client.query(`
+      SELECT table_name 
+      FROM information_schema.tables 
+      WHERE table_schema = 'public'
+      AND table_name LIKE 'panel_cost_cal_%'
+    `);
+    
+    const panelCitTables = tablesResult.rows.map(row => row.table_name);
+    const results = {};
+    
+    for (const table of panelCitTables) {
+      // Tablodaki timestamp sütunlarını kontrol et
+      const columnsResult = await client.query(`
+        SELECT column_name, data_type 
+        FROM information_schema.columns 
+        WHERE table_name = $1 
+        AND data_type = 'timestamp without time zone'
+      `, [table]);
+      
+      const timestampColumns = columnsResult.rows.map(row => row.column_name);
+      results[table] = {
+        columns_fixed: timestampColumns,
+        success: true
+      };
+      
+      // timestamp sütunlarını timestamptz'ye çevir
+      for (const column of timestampColumns) {
+        try {
+          await client.query(`
+            ALTER TABLE ${table} 
+            ALTER COLUMN ${column} TYPE TIMESTAMP WITH TIME ZONE
+          `);
+          console.log(`✅ ${table}.${column} başarıyla TIMESTAMP WITH TIME ZONE tipine güncellendi.`);
+        } catch (columnError) {
+          results[table].success = false;
+          results[table].error = columnError.message;
+          console.error(`❌ ${table}.${column} güncellenirken hata:`, columnError.message);
+        }
+      }
+    }
+    
+    await client.query('COMMIT');
+    res.json({
+      success: true,
+      message: 'Panel Cost Cal tablolarının timestamp alanları güncellendi',
+      details: results
+    });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Timestamp alanlarını güncelleme hatası:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  } finally {
+    client.release();
   }
 });
 

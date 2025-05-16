@@ -531,7 +531,8 @@ const tables = [
     'gal_cost_cal_mm_gt_ym_st',
     'gal_cost_cal_sequence',
     'gal_cost_cal_sal_requests', // Talepler tablosu
-    'gal_cost_cal_user_input_values' // Hesaplama değerleri için kullanıcı girdileri
+    'gal_cost_cal_user_input_values', // Hesaplama değerleri için kullanıcı girdileri
+    'gal_cost_cal_user_tlc_hizlar' // TLC Hızlar tablosu için
 ];
 
 // Tablo varlığını kontrol et, yoksa oluştur
@@ -566,6 +567,30 @@ async function checkAndCreateTable(tableName) {
             paketlemeDkAdet INTEGER NOT NULL DEFAULT 10,
             created_by VARCHAR(255)
           )
+        `;
+      } else if (tableName === 'gal_cost_cal_user_tlc_hizlar') {
+        createTableQuery = `
+          CREATE TABLE ${tableName} (
+            id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            giris_capi NUMERIC(5,2) NOT NULL,
+            cikis_capi NUMERIC(5,2) NOT NULL,
+            kod VARCHAR(15) NOT NULL,
+            total_red NUMERIC(12,9),
+            kafa_sayisi INTEGER,
+            calisma_hizi NUMERIC(5,2) NOT NULL,
+            uretim_kg_saat NUMERIC(12,4),
+            elektrik_sarfiyat_kw_sa NUMERIC(6,2),
+            elektrik_sarfiyat_kw_ton NUMERIC(8,4)
+          );
+          
+          -- Create indexes for improved performance
+          CREATE INDEX idx_gal_cost_cal_user_tlc_hizlar_giris_cikis 
+          ON ${tableName}(giris_capi, cikis_capi);
+          
+          CREATE INDEX idx_gal_cost_cal_user_tlc_hizlar_kod 
+          ON ${tableName}(kod);
         `;
       } else if (tableName === 'gal_cost_cal_sal_requests') {
         createTableQuery = `
@@ -1527,6 +1552,102 @@ app.get('/api/gal_cost_cal_sequence/next', async (req, res) => {
   } catch (error) {
     console.error('Sıra numarası alma hatası:', error);
     res.status(500).json({ error: error.message });
+  }
+});
+
+// TLC Hizlar verilerini eklemek için yardımcı endpoint
+app.post('/api/bulk-import/tlc-hizlar', async (req, res) => {
+  const client = await pool.connect();
+  
+  try {
+    const data = req.body;
+    
+    if (!Array.isArray(data)) {
+      return res.status(400).json({ error: 'Geçersiz veri formatı. Veri dizi tipinde olmalıdır.' });
+    }
+    
+    if (data.length === 0) {
+      return res.status(400).json({ error: 'Boş veri listesi gönderilemez.' });
+    }
+    
+    console.log(`📥 TLC Hızlar verisi eklenecek: ${data.length} adet kayıt`);
+    
+    await client.query('BEGIN');
+    
+    // Önce tüm mevcut verileri temizleyelim (opsiyonel, güvenli bir silme istiyorsanız)
+    const clearResult = await client.query('DELETE FROM gal_cost_cal_user_tlc_hizlar');
+    console.log(`🧹 Mevcut TLC Hızlar tablosu temizlendi: ${clearResult.rowCount} kayıt silindi`);
+    
+    // Başarılı ve başarısız sayısını izleyen değişkenler
+    let successCount = 0;
+    let errorCount = 0;
+    let errors = [];
+    
+    // Her bir veriyi ekle
+    for (const item of data) {
+      try {
+        // Sayısal değerleri normalize et
+        const normalizedItem = normalizeData(item);
+        
+        // giris_capi, cikis_capi ve calisma_hizi zorunlu alanlar
+        if (!normalizedItem.giris_capi || !normalizedItem.cikis_capi || !normalizedItem.calisma_hizi) {
+          throw new Error('Zorunlu alanlar eksik: giris_capi, cikis_capi, calisma_hizi');
+        }
+        
+        // kod alanı için giris_capi x cikis_capi formatı oluştur
+        const kod = `${normalizedItem.giris_capi}x${normalizedItem.cikis_capi}`;
+        
+        const insertQuery = `
+          INSERT INTO gal_cost_cal_user_tlc_hizlar (
+            giris_capi, cikis_capi, kod, total_red, kafa_sayisi, 
+            calisma_hizi, uretim_kg_saat, elektrik_sarfiyat_kw_sa, elektrik_sarfiyat_kw_ton
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+          RETURNING id
+        `;
+        
+        const values = [
+          normalizedItem.giris_capi,
+          normalizedItem.cikis_capi,
+          kod,
+          normalizedItem.total_red || null,
+          normalizedItem.kafa_sayisi || null,
+          normalizedItem.calisma_hizi,
+          normalizedItem.uretim_kg_saat || null,
+          normalizedItem.elektrik_sarfiyat_kw_sa || null,
+          normalizedItem.elektrik_sarfiyat_kw_ton || null
+        ];
+        
+        const result = await client.query(insertQuery, values);
+        successCount++;
+      } catch (error) {
+        errorCount++;
+        errors.push({
+          item,
+          error: error.message
+        });
+        console.error(`❌ TLC Hızlar verisi eklenirken hata:`, error.message);
+      }
+    }
+    
+    await client.query('COMMIT');
+    
+    console.log(`✅ TLC Hızlar verisi eklendi: ${successCount} başarılı, ${errorCount} başarısız`);
+    
+    res.status(201).json({
+      success: true,
+      message: `TLC Hızlar verileri başarıyla içe aktarıldı.`,
+      details: {
+        success_count: successCount,
+        error_count: errorCount,
+        errors: errors.length > 0 ? errors : undefined
+      }
+    });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('❌ TLC Hızlar toplu veri ekleme hatası:', error);
+    res.status(500).json({ error: error.message });
+  } finally {
+    client.release();
   }
 });
 

@@ -530,7 +530,8 @@ const tables = [
     'gal_cost_cal_ym_st_recete',
     'gal_cost_cal_mm_gt_ym_st',
     'gal_cost_cal_sequence',
-    'gal_cost_cal_sal_requests' // Yeni talepler tablosu ekledik
+    'gal_cost_cal_sal_requests', // Talepler tablosu
+    'gal_cost_cal_user_input_values' // Hesaplama değerleri için kullanıcı girdileri
 ];
 
 // Tablo varlığını kontrol et, yoksa oluştur
@@ -551,7 +552,22 @@ async function checkAndCreateTable(tableName) {
       let createTableQuery = '';
       
       // Tablo tipine göre oluştur
-      if (tableName === 'gal_cost_cal_sal_requests') {
+      if (tableName === 'gal_cost_cal_user_input_values') {
+        createTableQuery = `
+          CREATE TABLE ${tableName} (
+            id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            ash NUMERIC(10, 4) NOT NULL DEFAULT 5.54,
+            lapa NUMERIC(10, 4) NOT NULL DEFAULT 2.73,
+            uretim_kapasitesi_aylik INTEGER NOT NULL DEFAULT 2800,
+            toplam_tuketilen_asit INTEGER NOT NULL DEFAULT 30000,
+            ortalama_uretim_capi NUMERIC(10, 4) NOT NULL DEFAULT 3.08,
+            paketlemeDkAdet INTEGER NOT NULL DEFAULT 10,
+            created_by VARCHAR(255)
+          )
+        `;
+      } else if (tableName === 'gal_cost_cal_sal_requests') {
         createTableQuery = `
           CREATE TABLE ${tableName} (
             id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -735,6 +751,31 @@ async function checkAllTables() {
 
 // Uygulama başlatıldığında tabloları kontrol et
 checkAllTables();
+
+// İlk çalıştırmada varsayılan hesaplama değerlerini ekle
+async function insertDefaultUserInputValues() {
+  try {
+    // Eğer hiç kayıt yoksa varsayılan değerleri ekle
+    const existingValues = await pool.query('SELECT COUNT(*) FROM gal_cost_cal_user_input_values');
+    
+    if (parseInt(existingValues.rows[0].count) === 0) {
+      console.log('Varsayılan hesaplama değerleri ekleniyor...');
+      
+      await pool.query(`
+        INSERT INTO gal_cost_cal_user_input_values 
+        (ash, lapa, uretim_kapasitesi_aylik, toplam_tuketilen_asit, ortalama_uretim_capi, paketlemeDkAdet)
+        VALUES (5.54, 2.73, 2800, 30000, 3.08, 10)
+      `);
+      
+      console.log('✅ Varsayılan hesaplama değerleri başarıyla eklendi');
+    }
+  } catch (error) {
+    console.error('❌ Varsayılan hesaplama değerleri eklenirken hata:', error);
+  }
+}
+
+// Tablolar oluşturulduktan sonra varsayılan değerleri ekle
+setTimeout(insertDefaultUserInputValues, 5000);
 
 // Veri Getirmek için Genel GET Rotası - İyileştirilmiş hata işleme ile
 for (const table of tables) {

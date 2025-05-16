@@ -736,7 +736,7 @@ async function checkAllTables() {
 // Uygulama başlatıldığında tabloları kontrol et
 checkAllTables();
 
-// Veri Getirmek için Genel GET Rotası
+// Veri Getirmek için Genel GET Rotası - İyileştirilmiş hata işleme ile
 for (const table of tables) {
     app.get(`/api/${table}`, async (req, res) => {
         try {
@@ -824,6 +824,13 @@ for (const table of tables) {
             res.json(result.rows);
         } catch (error) {
             console.error(`${table} tablosundan veri getirme hatası:`, error);
+            
+            // Reçete tabloları için 404 hatası durumunda boş bir dizi döndür
+            if (table.endsWith('_recete')) {
+                console.log(`⚠️ ${table} tablosundan veri bulunamadı - boş dizi döndürülüyor`);
+                return res.json([]);
+            }
+            
             res.status(500).json({ 
               error: `${table} tablosundan veri getirme başarısız`,
               details: error.message,
@@ -909,7 +916,69 @@ app.put('/api/gal_cost_cal_sal_requests/:id/reject', async (req, res) => {
   }
 });
 
-// Veri Eklemek için Genel POST Rotası
+// Özel API: MMGT ve YMGT ID ile reçetelerin tam olup olmadığını kontrol eder
+app.get('/api/check-recipes', async (req, res) => {
+  try {
+    const { mm_gt_id, ym_gt_id } = req.query;
+    
+    if (!mm_gt_id || !ym_gt_id) {
+      return res.status(400).json({ error: 'mm_gt_id ve ym_gt_id zorunludur' });
+    }
+    
+    // 1. MMGT reçetelerini kontrol et
+    const mmGtRecipes = await pool.query('SELECT COUNT(*) FROM gal_cost_cal_mm_gt_recete WHERE mm_gt_id = $1', [mm_gt_id]);
+    
+    // 2. YMGT reçetelerini kontrol et
+    const ymGtRecipes = await pool.query('SELECT COUNT(*) FROM gal_cost_cal_ym_gt_recete WHERE ym_gt_id = $1', [ym_gt_id]);
+    
+    // MMGT ürününün kendisini bul (stok_kodu için)
+    const mmGtProduct = await pool.query('SELECT stok_kodu FROM gal_cost_cal_mm_gt WHERE id = $1', [mm_gt_id]);
+    
+    // YMGT ürününün kendisini bul (stok_kodu için)
+    const ymGtProduct = await pool.query('SELECT stok_kodu FROM gal_cost_cal_ym_gt WHERE id = $1', [ym_gt_id]);
+    
+    // İlişkiyi kontrol et
+    const relation = await pool.query(`
+      SELECT ym_st_id FROM gal_cost_cal_mm_gt_ym_st 
+      WHERE mm_gt_id = $1 
+      ORDER BY sira ASC LIMIT 1
+    `, [mm_gt_id]);
+    
+    const mainYmStId = relation.rows.length > 0 ? relation.rows[0].ym_st_id : null;
+    
+    // YMST reçetelerini kontrol et
+    let ymStRecipes = 0;
+    if (mainYmStId) {
+      const ymStResult = await pool.query('SELECT COUNT(*) FROM gal_cost_cal_ym_st_recete WHERE ym_st_id = $1', [mainYmStId]);
+      ymStRecipes = parseInt(ymStResult.rows[0].count);
+    }
+    
+    res.json({
+      status: 'success',
+      mm_gt_id: mm_gt_id,
+      ym_gt_id: ym_gt_id,
+      mm_gt_stok_kodu: mmGtProduct.rows.length > 0 ? mmGtProduct.rows[0].stok_kodu : null,
+      ym_gt_stok_kodu: ymGtProduct.rows.length > 0 ? ymGtProduct.rows[0].stok_kodu : null,
+      mm_gt_recipes: parseInt(mmGtRecipes.rows[0].count) || 0,
+      ym_gt_recipes: parseInt(ymGtRecipes.rows[0].count) || 0,
+      main_ym_st_id: mainYmStId,
+      ym_st_recipes: ymStRecipes,
+      has_all_recipes: (
+        parseInt(mmGtRecipes.rows[0].count) > 0 && 
+        parseInt(ymGtRecipes.rows[0].count) > 0 && 
+        (mainYmStId ? ymStRecipes > 0 : true)
+      )
+    });
+  } catch (error) {
+    console.error('Reçete kontrol hatası:', error);
+    res.status(500).json({ 
+      error: 'Reçeteler kontrol edilirken hata oluştu',
+      details: error.message
+    });
+  }
+});
+
+// Veri Eklemek için Genel POST Rotası - İyileştirilmiş reçete ekleme desteği ile
 for (const table of tables) {
     app.post(`/api/${table}`, async (req, res) => {
         try {
@@ -980,8 +1049,41 @@ for (const table of tables) {
                 console.log(`📥 Ekleniyor: ${table}`);
                 console.log("🧾 Sütunlar:", columns);
                 
-                const result = await pool.query(query, values);
-                res.status(201).json(result.rows[0]);
+                try {
+                  const result = await pool.query(query, values);
+                  
+                  // Reçete ekleme ise özel log
+                  if (table.endsWith('_recete')) {
+                    console.log(`✅ Reçete başarıyla eklendi: ${table}, ID: ${result.rows[0].id}`);
+                  }
+                  
+                  res.status(201).json(result.rows[0]);
+                } catch (insertError) {
+                  // Reçete tabloları için özel hata işleme
+                  if (table.endsWith('_recete')) {
+                    console.error(`❌ Reçete eklenirken hata: ${insertError.message}`);
+                    
+                    // Kullanıcıya daha dostu bir hata mesajı döndür
+                    if (insertError.code === '23502') {  // not-null constraint
+                      return res.status(400).json({ 
+                        error: 'Reçete için gerekli alanlar eksik',
+                        details: insertError.detail || insertError.message 
+                      });
+                    } else if (insertError.code === '23505') {  // unique constraint
+                      return res.status(409).json({
+                        error: 'Bu reçete zaten mevcut',
+                        details: insertError.detail || insertError.message
+                      });
+                    } else {
+                      return res.status(500).json({
+                        error: 'Reçete eklenirken bir hata oluştu',
+                        details: insertError.message
+                      });
+                    }
+                  }
+                  
+                  throw insertError; // Diğer tüm tablolar için normal hata işlemeye devam et
+                }
             }
         } catch (error) {
             console.error(`❌ '${table}' tablosuna ekleme başarısız:`, error);

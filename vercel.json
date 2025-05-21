@@ -2,14 +2,42 @@
   "version": 2,
   "builds": [
     {
+      "src": "api/**/*.js",
+      "use": "@vercel/node"
+    },
+    {
       "src": "index.js",
       "use": "@vercel/node"
     }
   ],
   "routes": [
     {
+      "src": "/api/login",
+      "dest": "/api/login.js"
+    },
+    {
+      "src": "/api/signup",
+      "dest": "/api/signup.js"
+    },
+    {
+      "src": "/api/test",
+      "dest": "/api/test.js"
+    },
+    {
+      "src": "/api/send-email-notification",
+      "dest": "/api/send-email-notification.js"
+    },
+    {
+      "src": "/api/user/permissions/:userId",
+      "dest": "/api/user-permissions.js?userId=$1"
+    },
+    {
+      "src": "/api/user/profile-picture",
+      "dest": "/api/profile-picture.js"
+    },
+    {
       "src": "/(.*)",
-      "dest": "index.js"
+      "dest": "/index.js"
     }
   ]
 }

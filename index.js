@@ -15,7 +15,33 @@ const allowedOrigins = [
   'http://localhost:3001'
 ];
 
-// CORS middleware - properly handles preflight and prevents duplicate headers
+// SPECIAL CORS MIDDLEWARE FOR VERCEL SERVERLESS ENVIRONMENT
+// Add a special middleware to handle preflight OPTIONS requests
+app.options('*', (req, res) => {
+  // Get the origin from the request
+  const origin = req.headers.origin;
+  
+  // Check if the origin is allowed
+  if (origin && allowedOrigins.indexOf(origin) !== -1) {
+    // Set CORS headers for preflight
+    res.header('Access-Control-Allow-Origin', origin);
+    res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Accept, X-Requested-With');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Max-Age', '86400'); // 24 hours
+    res.status(204).end();
+  } else {
+    // Default to the first allowed origin if the specific origin isn't allowed
+    res.header('Access-Control-Allow-Origin', allowedOrigins[0]);
+    res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Accept, X-Requested-With');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Max-Age', '86400'); // 24 hours
+    res.status(204).end();
+  }
+});
+
+// Normal CORS middleware for all other requests
 app.use(cors({
   origin: function(origin, callback) {
     // Allow requests with no origin (like mobile apps, curl, etc)
@@ -31,6 +57,24 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
   credentials: true
 }));
+
+// ADDITIONAL CORS HEADERS MIDDLEWARE - ensure headers are always present for Vercel
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  
+  // Set CORS headers for every response
+  if (origin && allowedOrigins.indexOf(origin) !== -1) {
+    res.header('Access-Control-Allow-Origin', origin);
+  } else {
+    res.header('Access-Control-Allow-Origin', allowedOrigins[0]);
+  }
+  
+  res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Accept, X-Requested-With');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  
+  next();
+});
 
 // Increase JSON payload size limit and add better error handling
 app.use(express.json({ limit: '10mb' }));

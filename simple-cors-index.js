@@ -7,22 +7,21 @@ const SibApiV3Sdk = require('sib-api-v3-sdk');
 
 const app = express();
 
-// Very simple CORS handling that doesn't use the cors package
-app.use((req, res, next) => {
-  // Allow all origins
+// Special handler for OPTIONS preflight requests
+app.options('*', (req, res) => {
+  console.log('Handling OPTIONS preflight request');
   res.header('Access-Control-Allow-Origin', '*');
-  
-  // Allow specific headers
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-  
-  // Allow specific methods
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  
-  // Handle preflight requests
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
-  
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  res.status(200).send();
+});
+
+// CORS middleware for all other requests
+app.use((req, res, next) => {
+  console.log(`${req.method} request to ${req.path}`);
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   next();
 });
 

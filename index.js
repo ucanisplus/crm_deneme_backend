@@ -17,28 +17,34 @@ const allowedOrigins = [
 
 // SPECIAL CORS MIDDLEWARE FOR VERCEL SERVERLESS ENVIRONMENT
 // Add a special middleware to handle preflight OPTIONS requests
-app.options('*', (req, res) => {
-  // Get the origin from the request
-  const origin = req.headers.origin;
-  
-  // Check if the origin is allowed
-  if (origin && allowedOrigins.indexOf(origin) !== -1) {
-    // Set CORS headers for preflight
-    res.header('Access-Control-Allow-Origin', origin);
-    res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Accept, X-Requested-With');
+app.use((req, res, next) => {
+  // Handle preflight OPTIONS requests
+  if (req.method === 'OPTIONS') {
+    console.log('Handling OPTIONS preflight request');
+    
+    // Get the origin from the request
+    const origin = req.headers.origin;
+    
+    // Set Access-Control-Allow-Origin header
+    if (origin && allowedOrigins.indexOf(origin) !== -1) {
+      res.header('Access-Control-Allow-Origin', origin);
+    } else {
+      // Use wildcard for local development or first allowed origin
+      res.header('Access-Control-Allow-Origin', '*');
+    }
+    
+    // Set all the necessary CORS headers
+    res.header('Access-Control-Allow-Methods', 'GET, HEAD, PUT, PATCH, POST, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
     res.header('Access-Control-Allow-Credentials', 'true');
-    res.header('Access-Control-Max-Age', '86400'); // 24 hours
-    res.status(204).end();
-  } else {
-    // Default to the first allowed origin if the specific origin isn't allowed
-    res.header('Access-Control-Allow-Origin', allowedOrigins[0]);
-    res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Accept, X-Requested-With');
-    res.header('Access-Control-Allow-Credentials', 'true');
-    res.header('Access-Control-Max-Age', '86400'); // 24 hours
-    res.status(204).end();
+    res.header('Access-Control-Max-Age', '86400'); // 24 hours cache for preflight
+    
+    // Return 200 OK status for preflight requests
+    return res.status(200).end();
   }
+  
+  // For non-OPTIONS requests, continue to the next middleware
+  next();
 });
 
 // Normal CORS middleware for all other requests

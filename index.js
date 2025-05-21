@@ -8,17 +8,31 @@ const SibApiV3Sdk = require('sib-api-v3-sdk');
 
 const app = express();
 
-// CRITICAL CORS FIX: Use the cors middleware ONLY ONCE with a proper configuration
+// IMPROVED CORS CONFIGURATION: Single source of truth with specific origins
+const allowedOrigins = [
+  'https://crm-deneme-1.vercel.app',
+  'http://localhost:3000',
+  'http://localhost:3001'
+];
+
+// CORS middleware - properly handles preflight and prevents duplicate headers
 app.use(cors({
-  // Allow specific origins - IMPORTANT: Do NOT include wildcards (*) along with specific domains
-  origin: ['https://crm-deneme-1.vercel.app', 'http://localhost:3000'],
+  origin: function(origin, callback) {
+    // Allow requests with no origin (like mobile apps, curl, etc)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, origin); // allow specific origin
+    } else {
+      callback(null, allowedOrigins[0]); // or default to first origin
+    }
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
-  credentials: true,
-  maxAge: 86400 // 24-hour preflight cache for better performance
+  credentials: true
 }));
 
-// Increase JSON payload size limit
+// Increase JSON payload size limit and add better error handling
 app.use(express.json({ limit: '10mb' }));
 
 // JSON parse error handling middleware
@@ -86,104 +100,6 @@ pool.on('error', (err) => {
   console.error('Unexpected database error:', err);
 });
 
-// Helper function for number formatting
-const normalizeNumber = (value) => {
-  // Return null for null or undefined values
-  if (value === null || value === undefined) {
-    return null;
-  }
-  
-  if (typeof value === 'number') {
-    return value;
-  }
-  
-  if (typeof value === 'string') {
-    // Empty string check
-    if (value.trim() === '') {
-      return null;
-    }
-    
-    // Convert commas to dots - with global flag to replace all commas
-    if (value.includes(',')) {
-      return parseFloat(value.replace(/,/g, '.'));
-    }
-    
-    // Check if it's a numeric value
-    if (!isNaN(parseFloat(value))) {
-      return parseFloat(value);
-    }
-  }
-  
-  return value;
-};
-
-// Helper function to process data - converts comma-formatted numbers to dot format
-const normalizeData = (data) => {
-  // Check for null or undefined values
-  if (data === null || data === undefined) {
-    return null;
-  }
-  
-  // If it's an array, process each item
-  if (Array.isArray(data)) {
-    return data.map(item => normalizeData(item));
-  }
-  
-  // If it's an object, process each value
-  if (typeof data === 'object') {
-    const normalizedData = {};
-    
-    for (const [key, value] of Object.entries(data)) {
-      // Empty string check
-      if (typeof value === 'string' && value.trim() === '') {
-        normalizedData[key] = null;
-      }
-      // If the value is an object or array, process its contents too
-      else if (value !== null && typeof value === 'object') {
-        normalizedData[key] = normalizeData(value);
-      } else {
-        normalizedData[key] = normalizeNumber(value);
-      }
-    }
-    
-    return normalizedData;
-  }
-  
-  // For all other cases, apply number normalization
-  return normalizeNumber(data);
-};
-
-// Data validation function
-const validateData = (data) => {
-  if (!data) {
-    return { valid: false, error: 'Veri boş olamaz' };
-  }
-  
-  if (typeof data !== 'object' || (Array.isArray(data) && data.length === 0)) {
-    return { valid: false, error: 'Geçersiz veri formatı' };
-  }
-  
-  if (!Array.isArray(data) && Object.keys(data).length === 0) {
-    return { valid: false, error: 'Boş nesne gönderilemez' };
-  }
-  
-  return { valid: true };
-};
-
-// CORS test endpoint - useful for troubleshooting
-app.get('/api/cors-test', (req, res) => {
-  console.log('CORS test endpoint hit');
-  console.log('Request headers:', req.headers);
-  
-  res.json({ 
-    success: true, 
-    message: 'CORS is working properly', 
-    headers_received: req.headers,
-    headers_sent: res.getHeaders(),
-    timestamp: new Date().toISOString()
-  });
-});
-
 // Configure Brevo (Sendinblue) email client
 let apiInstance = null;
 try {
@@ -199,9 +115,6 @@ try {
 // Email Sending Endpoint
 app.post('/api/send-email-notification', async (req, res) => {
   console.log('📨 Email notification request received');
-  
-  // Log headers to debug CORS issues
-  console.log('Request Headers:', JSON.stringify(req.headers, null, 2));
   
   try {
     if (!apiInstance) {
@@ -274,6 +187,90 @@ app.post('/api/send-email-notification', async (req, res) => {
   }
 });
 
+// Helper function for number formatting
+const normalizeNumber = (value) => {
+  // Return null for null or undefined values
+  if (value === null || value === undefined) {
+    return null;
+  }
+  
+  if (typeof value === 'number') {
+    return value;
+  }
+  
+  if (typeof value === 'string') {
+    // Empty string check
+    if (value.trim() === '') {
+      return null;
+    }
+    
+    // Convert commas to dots - with global flag to replace all commas
+    if (value.includes(',')) {
+      return parseFloat(value.replace(/,/g, '.'));
+    }
+    
+    // Check if it's a numeric value
+    if (!isNaN(parseFloat(value))) {
+      return parseFloat(value);
+    }
+  }
+  
+  return value;
+};
+
+// Helper function to process data - converting comma decimals to period format
+const normalizeData = (data) => {
+  // Check for null or undefined values
+  if (data === null || data === undefined) {
+    return null;
+  }
+  
+  // Process each item if it's an array
+  if (Array.isArray(data)) {
+    return data.map(item => normalizeData(item));
+  }
+  
+  // Process each value if it's an object
+  if (typeof data === 'object') {
+    const normalizedData = {};
+    
+    for (const [key, value] of Object.entries(data)) {
+      // Check for empty string
+      if (typeof value === 'string' && value.trim() === '') {
+        normalizedData[key] = null;
+      }
+      // Process content if value is an object or array
+      else if (value !== null && typeof value === 'object') {
+        normalizedData[key] = normalizeData(value);
+      } else {
+        normalizedData[key] = normalizeNumber(value);
+      }
+    }
+    
+    return normalizedData;
+  }
+  
+  // Apply number normalization for all other cases
+  return normalizeNumber(data);
+};
+
+// Data validation function
+const validateData = (data) => {
+  if (!data) {
+    return { valid: false, error: 'Veri boş olamaz' };
+  }
+  
+  if (typeof data !== 'object' || (Array.isArray(data) && data.length === 0)) {
+    return { valid: false, error: 'Geçersiz veri formatı' };
+  }
+  
+  if (!Array.isArray(data) && Object.keys(data).length === 0) {
+    return { valid: false, error: 'Boş nesne gönderilemez' };
+  }
+  
+  return { valid: true };
+};
+
 // Test Route
 app.get('/api/test', async (req, res) => {
     try {
@@ -291,8 +288,6 @@ app.get('/api/test', async (req, res) => {
 // User Registration Route
 app.post('/api/signup', async (req, res) => {
     console.log('📋 Signup request received');
-    // Log headers to debug CORS issues
-    console.log('Request Headers:', JSON.stringify(req.headers, null, 2));
     
     const { username, password, email, role = 'engineer_1' } = req.body;
 
@@ -327,8 +322,6 @@ app.post('/api/signup', async (req, res) => {
 // User Login
 app.post('/api/login', async (req, res) => {
     console.log('🔑 Login request received');
-    // Log headers to debug CORS issues
-    console.log('Request Headers:', JSON.stringify(req.headers, null, 2));
     console.log('Request Body:', JSON.stringify(req.body, null, 2));
     
     const { username, password } = req.body;
@@ -732,7 +725,10 @@ async function checkAndCreateTable(tableName) {
             tolerans_plus NUMERIC(10, 4),
             tolerans_minus NUMERIC(10, 4),
             shrink VARCHAR(50),
-            unwinding VARCHAR(50)
+            unwinding VARCHAR(50),
+            cast_kont VARCHAR(50),
+            helix_kont VARCHAR(50),
+            elongation VARCHAR(50)
           )
         `;
       } else if (tableName.endsWith('_recete')) {

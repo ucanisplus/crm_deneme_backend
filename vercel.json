@@ -13,11 +13,31 @@
   "routes": [
     {
       "src": "/api/send-email-notification",
+      "methods": ["OPTIONS"],
+      "status": 200,
+      "headers": {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization, Origin, X-Requested-With, Accept"
+      }
+    },
+    {
+      "src": "/api/send-email-notification",
       "dest": "/api/send-email-notification.js",
       "headers": {
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type, Authorization"
+        "Access-Control-Allow-Headers": "Content-Type, Authorization, Origin, X-Requested-With, Accept"
+      }
+    },
+    {
+      "src": "/api/(.*)",
+      "methods": ["OPTIONS"],
+      "status": 200,
+      "headers": {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+        "Access-Control-Allow-Headers": "Origin, X-Requested-With, Content-Type, Accept, Authorization"
       }
     },
     {

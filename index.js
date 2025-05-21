@@ -7,22 +7,26 @@ const SibApiV3Sdk = require('sib-api-v3-sdk');
 
 const app = express();
 
-// Allow CORS - Enhanced version
-// Handle OPTIONS preflight requests explicitly
+// Allow CORS using the cors middleware package
+const cors = require('cors');
+
+// CORS configuration
+app.use(cors({
+  origin: '*',  // In production you should restrict this to your frontend domain
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization']
+}));
+
+// Handle OPTIONS preflight requests explicitly and return proper status code
 app.options('*', (req, res) => {
   console.log('Handling OPTIONS preflight request');
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-  res.status(200).send();
+  // No need to set headers manually as cors middleware handles this
+  res.sendStatus(200); // This explicitly sends a 200 OK status
 });
 
-// Add CORS headers to all responses
+// Log requests
 app.use((req, res, next) => {
   console.log(`${req.method} request to ${req.path}`);
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   next();
 });
 

@@ -21,7 +21,8 @@ module.exports = async (req, res) => {
   
   // Handle OPTIONS request
   if (req.method === 'OPTIONS') {
-    return res.status(200).end();
+    // Explicitly send 200 status code for preflight requests
+    return res.sendStatus(200);
   }
   
   // Handle email sending

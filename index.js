@@ -1,28 +1,20 @@
-// COMPLETE VERSION OF INDEX.JS WITH CORS ISSUE FIXED AND EMAIL FUNCTIONALITY
+// COMPLETE VERSION OF INDEX.JS WITH EMAIL FUNCTIONALITY AND NO CORS MIDDLEWARE
 require('dotenv').config();
 const express = require('express');
-const cors = require('cors');
 const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 const SibApiV3Sdk = require('sib-api-v3-sdk');
 
 const app = express();
 
-// Special handler for OPTIONS preflight requests
-app.options('*', (req, res) => {
-  console.log('Handling OPTIONS preflight request');
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-  res.status(200).send();
-});
-
-// CORS middleware for all other requests
-app.use((req, res, next) => {
-  console.log(`${req.method} request to ${req.path}`);
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+// Allow CORS
+app.use(function(req, res, next) {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Accept");
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
   next();
 });
 

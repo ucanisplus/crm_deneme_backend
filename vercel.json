@@ -2,7 +2,7 @@
   "version": 2,
   "builds": [
     {
-      "src": "api/**/*.js",
+      "src": "api/all-in-one.js",
       "use": "@vercel/node"
     },
     {
@@ -12,64 +12,8 @@
   ],
   "routes": [
     {
-      "src": "/api/login",
-      "dest": "/api/auth.js"
-    },
-    {
-      "src": "/api/signup",
-      "dest": "/api/auth.js"
-    },
-    {
-      "src": "/api/test",
-      "dest": "/api/auth.js"
-    },
-    {
-      "src": "/api/user/permissions/(.*)",
-      "dest": "/api/auth.js"
-    },
-    {
-      "src": "/api/user/profile-picture",
-      "dest": "/api/auth.js"
-    },
-    {
-      "src": "/api/users(.*)",
-      "dest": "/api/auth.js"
-    },
-    {
-      "src": "/api/user-permissions(.*)",
-      "dest": "/api/auth.js"
-    },
-    {
-      "src": "/api/change-password",
-      "dest": "/api/auth.js"
-    },
-    {
-      "src": "/api/send-email-notification",
-      "dest": "/api/send-email-notification.js"
-    },
-    {
-      "src": "/api/gal_cost_cal_sequence/next",
-      "dest": "/api/tables-operations.js"
-    },
-    {
-      "src": "/api/check-recipes",
-      "dest": "/api/tables-operations.js"
-    },
-    {
-      "src": "/api/gal_cost_cal_sal_requests/count",
-      "dest": "/api/tables-operations.js"
-    },
-    {
-      "src": "/api/gal_cost_cal_sal_requests/(.*)/approve",
-      "dest": "/api/tables-operations.js"
-    },
-    {
-      "src": "/api/gal_cost_cal_sal_requests/(.*)/reject",
-      "dest": "/api/tables-operations.js"
-    },
-    {
-      "src": "/api/(gal_cost_cal_|panel_cost_cal_|crm_users|user_permissions|profile_pictures)(.*)",
-      "dest": "/api/tables.js"
+      "src": "/api/(.*)",
+      "dest": "/api/all-in-one.js"
     },
     {
       "src": "/(.*)",

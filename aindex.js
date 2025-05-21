@@ -1,30 +1,36 @@
-// COMPLETE VERSION OF INDEX.JS WITH EMAIL FUNCTIONALITY AND CORS MIDDLEWARE
+// COMPLETE VERSION OF INDEX.JS WITH EMAIL FUNCTIONALITY AND NO CORS MIDDLEWARE
 require('dotenv').config();
 const express = require('express');
 const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 const SibApiV3Sdk = require('sib-api-v3-sdk');
-const cors = require('cors');
 
 const app = express();
 
-// Setup CORS middleware - the proper way
+// Allow CORS using the cors middleware package
+const cors = require('cors');
+
+// CORS configuration
 app.use(cors({
-  origin: '*',  // In production you would restrict this to your frontend domain
+  origin: '*',  // In production you should restrict this to your frontend domain
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization']
 }));
 
-// This ensures OPTIONS requests get a 200 response
-app.options('*', cors());
+// Handle OPTIONS preflight requests explicitly and return proper status code
+app.options('*', (req, res) => {
+  console.log('Handling OPTIONS preflight request');
+  // No need to set headers manually as cors middleware handles this
+  res.sendStatus(200); // This explicitly sends a 200 OK status
+});
 
-// Request logging middleware
+// Log requests
 app.use((req, res, next) => {
   console.log(`${req.method} request to ${req.path}`);
   next();
 });
 
-// Increase JSON payload size limit
+// Increase JSON payload size limit and add better error handling
 app.use(express.json({ limit: '10mb' }));
 
 // JSON parse error handling middleware
@@ -36,7 +42,7 @@ app.use((err, req, res, next) => {
       details: err.message
     });
   }
-  next(err); // Pass the error to the next middleware
+  next();
 });
 
 // EMERGENCY FIX: Remove timestamp fields that cause problems
@@ -199,6 +205,81 @@ const validateData = (data) => {
   
   return { valid: true };
 };
+
+// Email Sending Endpoint
+app.post('/api/send-email-notification', async (req, res) => {
+  console.log('📨 Email notification request received');
+  
+  try {
+    if (!apiInstance) {
+      return res.status(500).json({ error: 'Email client not initialized properly' });
+    }
+    
+    const { to, subject, text, html, from = 'ucanisplus@gmail.com', fromName = 'TLC Metal CRM', cc, bcc, replyTo } = req.body;
+    
+    if (!to || !subject || (!text && !html)) {
+      return res.status(400).json({ error: 'Alıcı (to), konu (subject) ve mesaj içeriği (text veya html) gereklidir' });
+    }
+    
+    // Format recipients correctly
+    const toRecipients = Array.isArray(to) 
+      ? to.map(email => ({ email })) 
+      : [{ email: to }];
+    
+    // Format CC recipients (if provided)
+    const ccRecipients = cc ? (Array.isArray(cc) 
+      ? cc.map(email => ({ email })) 
+      : [{ email: cc }]) : [];
+    
+    // Format BCC recipients (if provided)
+    const bccRecipients = bcc ? (Array.isArray(bcc) 
+      ? bcc.map(email => ({ email })) 
+      : [{ email: bcc }]) : [];
+    
+    // Create email message
+    const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
+    sendSmtpEmail.subject = subject;
+    sendSmtpEmail.htmlContent = html || `<p>${text}</p>`;
+    sendSmtpEmail.sender = { name: fromName, email: from || 'ucanisplus@gmail.com' };
+    sendSmtpEmail.to = toRecipients;
+    
+    // Add optional fields
+    if (ccRecipients.length > 0) sendSmtpEmail.cc = ccRecipients;
+    if (bccRecipients.length > 0) sendSmtpEmail.bcc = bccRecipients;
+    if (replyTo) sendSmtpEmail.replyTo = { email: replyTo };
+    if (text) sendSmtpEmail.textContent = text;
+    
+    console.log('📧 Sending email:', {
+      to: Array.isArray(to) ? to.join(', ') : to,
+      from: from || 'ucanisplus@gmail.com',
+      subject
+    });
+    
+    // Send the email
+    const data = await apiInstance.sendTransacEmail(sendSmtpEmail);
+    
+    console.log('✅ Email sent successfully:', data);
+    res.status(200).json({ success: true, message: 'E-posta başarıyla gönderildi', data });
+  } catch (error) {
+    console.error('❌ Email sending error:', error);
+    
+    // Check for Brevo-specific error messages
+    if (error.response && error.response.body) {
+      console.error('Brevo response error:', error.response.body);
+      
+      return res.status(500).json({ 
+        error: 'E-posta gönderilemedi', 
+        details: error.message,
+        brevoError: error.response.body
+      });
+    }
+    
+    res.status(500).json({ 
+      error: 'E-posta gönderilemedi', 
+      details: error.message 
+    });
+  }
+});
 
 // Test Route
 app.get('/api/test', async (req, res) => {
@@ -539,81 +620,6 @@ app.post('/api/user/profile-picture', async (req, res) => {
   } catch (error) {
     console.error("Profil resmi güncelleme hatası:", error);
     res.status(500).json({ error: error.message });
-  }
-});
-
-// Email Sending Endpoint
-app.post('/api/send-email-notification', async (req, res) => {
-  console.log('📨 Email notification request received');
-  
-  try {
-    if (!apiInstance) {
-      return res.status(500).json({ error: 'Email client not initialized properly' });
-    }
-    
-    const { to, subject, text, html, from = 'ucanisplus@gmail.com', fromName = 'TLC Metal CRM', cc, bcc, replyTo } = req.body;
-    
-    if (!to || !subject || (!text && !html)) {
-      return res.status(400).json({ error: 'Alıcı (to), konu (subject) ve mesaj içeriği (text veya html) gereklidir' });
-    }
-    
-    // Format recipients correctly
-    const toRecipients = Array.isArray(to) 
-      ? to.map(email => ({ email })) 
-      : [{ email: to }];
-    
-    // Format CC recipients (if provided)
-    const ccRecipients = cc ? (Array.isArray(cc) 
-      ? cc.map(email => ({ email })) 
-      : [{ email: cc }]) : [];
-    
-    // Format BCC recipients (if provided)
-    const bccRecipients = bcc ? (Array.isArray(bcc) 
-      ? bcc.map(email => ({ email })) 
-      : [{ email: bcc }]) : [];
-    
-    // Create email message
-    const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
-    sendSmtpEmail.subject = subject;
-    sendSmtpEmail.htmlContent = html || `<p>${text}</p>`;
-    sendSmtpEmail.sender = { name: fromName, email: from || 'ucanisplus@gmail.com' };
-    sendSmtpEmail.to = toRecipients;
-    
-    // Add optional fields
-    if (ccRecipients.length > 0) sendSmtpEmail.cc = ccRecipients;
-    if (bccRecipients.length > 0) sendSmtpEmail.bcc = bccRecipients;
-    if (replyTo) sendSmtpEmail.replyTo = { email: replyTo };
-    if (text) sendSmtpEmail.textContent = text;
-    
-    console.log('📧 Sending email:', {
-      to: Array.isArray(to) ? to.join(', ') : to,
-      from: from || 'ucanisplus@gmail.com',
-      subject
-    });
-    
-    // Send the email
-    const data = await apiInstance.sendTransacEmail(sendSmtpEmail);
-    
-    console.log('✅ Email sent successfully:', data);
-    res.status(200).json({ success: true, message: 'E-posta başarıyla gönderildi', data });
-  } catch (error) {
-    console.error('❌ Email sending error:', error);
-    
-    // Check for Brevo-specific error messages
-    if (error.response && error.response.body) {
-      console.error('Brevo response error:', error.response.body);
-      
-      return res.status(500).json({ 
-        error: 'E-posta gönderilemedi', 
-        details: error.message,
-        brevoError: error.response.body
-      });
-    }
-    
-    res.status(500).json({ 
-      error: 'E-posta gönderilemedi', 
-      details: error.message 
-    });
   }
 });
 

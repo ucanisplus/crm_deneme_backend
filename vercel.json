@@ -2,14 +2,14 @@
   "version": 2,
   "builds": [
     {
-      "src": "diag-index.js",
+      "src": "index.js",
       "use": "@vercel/node"
     }
   ],
   "routes": [
     {
       "src": "/(.*)",
-      "dest": "diag-index.js",
+      "dest": "index.js",
       "headers": {
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS",

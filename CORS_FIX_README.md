@@ -25,12 +25,18 @@ We implemented a serverless API approach where each critical endpoint has its ow
 #### 1. API Directory Structure
 ```
 /api
-├── login.js                    # Handles user authentication
-├── profile-picture.js          # Handles profile picture operations
-├── send-email-notification.js  # Handles email notifications
-├── signup.js                   # Handles user registration
-├── test.js                     # Tests database connection
-└── user-permissions.js         # Handles user permissions
+├── check-recipes.js           # Check if recipes exist
+├── login.js                   # Handles user authentication
+├── profile-picture.js         # Handles profile picture operations
+├── sal-requests-approve.js    # Handles approving SAL requests
+├── sal-requests-count.js      # Counts SAL requests
+├── sal-requests-reject.js     # Handles rejecting SAL requests
+├── send-email-notification.js # Handles email notifications
+├── sequence.js                # Handles sequence number generation
+├── signup.js                  # Handles user registration
+├── tables.js                  # Generic handler for database table operations
+├── test.js                    # Tests database connection
+└── user-permissions.js        # Handles user permissions
 ```
 
 #### 2. CORS Headers Implementation
@@ -41,7 +47,7 @@ Each API file includes the following CORS handling code:
 // Set CORS headers directly for this endpoint
 res.setHeader('Access-Control-Allow-Origin', '*');
 res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS'); // Methods specific to the endpoint
-res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept');
 
 // Handle OPTIONS request
 if (req.method === 'OPTIONS') {
@@ -50,6 +56,8 @@ if (req.method === 'OPTIONS') {
 ```
 
 #### 3. Vercel.json Configuration
+
+The vercel.json file has been updated to route specific endpoints to their respective API files. For example:
 
 ```json
 {
@@ -90,6 +98,20 @@ if (req.method === 'OPTIONS') {
       "dest": "/api/profile-picture.js"
     },
     {
+      "src": "/api/gal_cost_cal_sequence/next",
+      "dest": "/api/sequence.js"
+    },
+    {
+      "src": "/api/check-recipes",
+      "dest": "/api/check-recipes.js"
+    },
+    // Database table routes
+    {
+      "src": "/api/gal_cost_cal_mm_gt",
+      "dest": "/api/tables.js"
+    },
+    // ...more routes...
+    {
       "src": "/(.*)",
       "dest": "/index.js"
     }
@@ -97,7 +119,20 @@ if (req.method === 'OPTIONS') {
 }
 ```
 
-#### 4. Testing
+#### 4. Database Table Handling
+
+The `tables.js` API file is a generic handler for all database table operations, supporting:
+
+- GET - Retrieve records
+- POST - Create new records
+- PUT - Update existing records
+- DELETE - Delete records
+
+It supports all tables used in the application, including:
+- Galvanizli Tel tables (gal_cost_cal_*)
+- Panel Çit tables (panel_cost_cal_*)
+
+#### 5. Testing
 
 We've included a `cors-test.html` file that can be used to test the endpoints and verify CORS headers are working correctly.
 
@@ -131,3 +166,4 @@ If CORS issues persist:
 3. Ensure preflight OPTIONS requests are responding with status 200
 4. Verify that all required CORS headers are present in the response
 5. Make sure the Vercel deployment has the latest version of the code
+6. Check that the frontend is using the correct API URL

@@ -36,6 +36,202 @@
       "dest": "/api/profile-picture.js"
     },
     {
+      "src": "/api/gal_cost_cal_sequence/next",
+      "dest": "/api/sequence.js"
+    },
+    {
+      "src": "/api/check-recipes",
+      "dest": "/api/check-recipes.js"
+    },
+    {
+      "src": "/api/gal_cost_cal_sal_requests/count",
+      "dest": "/api/sal-requests-count.js"
+    },
+    {
+      "src": "/api/gal_cost_cal_sal_requests/:id/approve",
+      "dest": "/api/sal-requests-approve.js"
+    },
+    {
+      "src": "/api/gal_cost_cal_sal_requests/:id/reject",
+      "dest": "/api/sal-requests-reject.js"
+    },
+    {
+      "src": "/api/gal_cost_cal_mm_gt",
+      "dest": "/api/tables.js"
+    },
+    {
+      "src": "/api/gal_cost_cal_mm_gt/(.*)",
+      "dest": "/api/tables.js"
+    },
+    {
+      "src": "/api/gal_cost_cal_ym_gt",
+      "dest": "/api/tables.js"
+    },
+    {
+      "src": "/api/gal_cost_cal_ym_gt/(.*)",
+      "dest": "/api/tables.js"
+    },
+    {
+      "src": "/api/gal_cost_cal_ym_st",
+      "dest": "/api/tables.js"
+    },
+    {
+      "src": "/api/gal_cost_cal_ym_st/(.*)",
+      "dest": "/api/tables.js"
+    },
+    {
+      "src": "/api/gal_cost_cal_mm_gt_recete",
+      "dest": "/api/tables.js"
+    },
+    {
+      "src": "/api/gal_cost_cal_mm_gt_recete/(.*)",
+      "dest": "/api/tables.js"
+    },
+    {
+      "src": "/api/gal_cost_cal_ym_gt_recete",
+      "dest": "/api/tables.js"
+    },
+    {
+      "src": "/api/gal_cost_cal_ym_gt_recete/(.*)",
+      "dest": "/api/tables.js"
+    },
+    {
+      "src": "/api/gal_cost_cal_ym_st_recete",
+      "dest": "/api/tables.js"
+    },
+    {
+      "src": "/api/gal_cost_cal_ym_st_recete/(.*)",
+      "dest": "/api/tables.js"
+    },
+    {
+      "src": "/api/gal_cost_cal_mm_gt_ym_st",
+      "dest": "/api/tables.js"
+    },
+    {
+      "src": "/api/gal_cost_cal_mm_gt_ym_st/(.*)",
+      "dest": "/api/tables.js"
+    },
+    {
+      "src": "/api/gal_cost_cal_sequence",
+      "dest": "/api/tables.js"
+    },
+    {
+      "src": "/api/gal_cost_cal_sequence/(.*)",
+      "dest": "/api/tables.js"
+    },
+    {
+      "src": "/api/gal_cost_cal_sal_requests",
+      "dest": "/api/tables.js"
+    },
+    {
+      "src": "/api/gal_cost_cal_sal_requests/(.*)",
+      "dest": "/api/tables.js"
+    },
+    {
+      "src": "/api/gal_cost_cal_user_input_values",
+      "dest": "/api/tables.js"
+    },
+    {
+      "src": "/api/gal_cost_cal_user_input_values/(.*)",
+      "dest": "/api/tables.js"
+    },
+    {
+      "src": "/api/gal_cost_cal_user_tlc_hizlar",
+      "dest": "/api/tables.js"
+    },
+    {
+      "src": "/api/gal_cost_cal_user_tlc_hizlar/(.*)",
+      "dest": "/api/tables.js"
+    },
+    {
+      "src": "/api/panel_cost_cal_currency",
+      "dest": "/api/tables.js"
+    },
+    {
+      "src": "/api/panel_cost_cal_currency/(.*)",
+      "dest": "/api/tables.js"
+    },
+    {
+      "src": "/api/panel_cost_cal_gecici_hesaplar",
+      "dest": "/api/tables.js"
+    },
+    {
+      "src": "/api/panel_cost_cal_gecici_hesaplar/(.*)",
+      "dest": "/api/tables.js"
+    },
+    {
+      "src": "/api/panel_cost_cal_genel_degiskenler",
+      "dest": "/api/tables.js"
+    },
+    {
+      "src": "/api/panel_cost_cal_genel_degiskenler/(.*)",
+      "dest": "/api/tables.js"
+    },
+    {
+      "src": "/api/panel_cost_cal_maliyet_listesi",
+      "dest": "/api/tables.js"
+    },
+    {
+      "src": "/api/panel_cost_cal_maliyet_listesi/(.*)",
+      "dest": "/api/tables.js"
+    },
+    {
+      "src": "/api/panel_cost_cal_panel_cit_degiskenler",
+      "dest": "/api/tables.js"
+    },
+    {
+      "src": "/api/panel_cost_cal_panel_cit_degiskenler/(.*)",
+      "dest": "/api/tables.js"
+    },
+    {
+      "src": "/api/panel_cost_cal_panel_list",
+      "dest": "/api/tables.js"
+    },
+    {
+      "src": "/api/panel_cost_cal_panel_list/(.*)",
+      "dest": "/api/tables.js"
+    },
+    {
+      "src": "/api/panel_cost_cal_profil_degiskenler",
+      "dest": "/api/tables.js"
+    },
+    {
+      "src": "/api/panel_cost_cal_profil_degiskenler/(.*)",
+      "dest": "/api/tables.js"
+    },
+    {
+      "src": "/api/panel_cost_cal_statik_degiskenler",
+      "dest": "/api/tables.js"
+    },
+    {
+      "src": "/api/panel_cost_cal_statik_degiskenler/(.*)",
+      "dest": "/api/tables.js"
+    },
+    {
+      "src": "/api/crm_users",
+      "dest": "/api/tables.js"
+    },
+    {
+      "src": "/api/crm_users/(.*)",
+      "dest": "/api/tables.js"
+    },
+    {
+      "src": "/api/user_permissions",
+      "dest": "/api/tables.js"
+    },
+    {
+      "src": "/api/user_permissions/(.*)",
+      "dest": "/api/tables.js"
+    },
+    {
+      "src": "/api/profile_pictures",
+      "dest": "/api/tables.js"
+    },
+    {
+      "src": "/api/profile_pictures/(.*)",
+      "dest": "/api/tables.js"
+    },
+    {
       "src": "/(.*)",
       "dest": "/index.js"
     }

@@ -5,16 +5,20 @@ const cors = require('cors');
 const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 const SibApiV3Sdk = require('sib-api-v3-sdk');
+const customCorsMiddleware = require('./middleware/cors');
 
 const app = express();
-app.use(cors({
-  origin: '*',  // Allow all origins for development
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
-}));
 
-// CORS Preflight control for OPTIONS
-app.options('*', cors());
+// Apply custom CORS middleware first - this is crucial for Vercel deployment
+app.use(customCorsMiddleware);
+
+// Then apply regular CORS as a fallback
+app.use(cors({
+  origin: ['https://crm-deneme-1.vercel.app', 'http://localhost:3000'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+  credentials: true
+}));
 
 // Increase JSON payload size limit and add better error handling
 app.use(express.json({ limit: '10mb' }));
@@ -1560,7 +1564,20 @@ app.get('/', (req, res) => {
     status: 'ok',
     message: 'Backend is running correctly',
     timestamp: new Date().toISOString(),
-    email_status: apiInstance ? 'Email client is configured correctly' : 'Email client not initialized'
+    email_status: apiInstance ? 'Email client is configured correctly' : 'Email client not initialized',
+    request_headers: req.headers,
+    cors_enabled: true
+  });
+});
+
+// CORS diagnostic endpoint
+app.get('/api/cors-test', (req, res) => {
+  res.json({
+    success: true,
+    message: 'CORS is working properly',
+    origin: req.headers.origin || 'No origin header',
+    requestHeaders: req.headers,
+    timestamp: new Date().toISOString()
   });
 });
 

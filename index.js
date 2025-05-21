@@ -7,14 +7,22 @@ const SibApiV3Sdk = require('sib-api-v3-sdk');
 
 const app = express();
 
-// Allow CORS
-app.use(function(req, res, next) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Accept");
-  if (req.method === "OPTIONS") {
-    return res.status(200).end();
-  }
+// Allow CORS - Enhanced version
+// Handle OPTIONS preflight requests explicitly
+app.options('*', (req, res) => {
+  console.log('Handling OPTIONS preflight request');
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  res.status(200).send();
+});
+
+// Add CORS headers to all responses
+app.use((req, res, next) => {
+  console.log(`${req.method} request to ${req.path}`);
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   next();
 });
 

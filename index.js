@@ -28,11 +28,23 @@ app.use((req, res, next) => {
 // Body parser middleware
 app.use(express.json({ limit: '10mb' }));
 
-// Database Connection
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }
-});
+// Database Connection - with error handling
+let pool;
+try {
+  pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false }
+  });
+  console.log('✅ Database connection initialized');
+} catch (error) {
+  console.error('❌ Failed to initialize database connection:', error);
+  // Create a dummy pool that will return errors for all queries
+  pool = {
+    query: () => Promise.reject(new Error('Database connection not available')),
+    on: () => {},
+    connect: () => Promise.reject(new Error('Database connection not available'))
+  };
+}
 
 // Setup Brevo Email API
 let apiInstance = null;

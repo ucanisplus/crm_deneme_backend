@@ -8,52 +8,25 @@ const SibApiV3Sdk = require('sib-api-v3-sdk');
 
 const app = express();
 
-// IMPROVED CORS CONFIGURATION: Single source of truth with specific origins
-const allowedOrigins = [
-  'https://crm-deneme-1.vercel.app',
-  'http://localhost:3000',
-  'http://localhost:3001'
-];
-
-// SPECIAL CORS MIDDLEWARE FOR VERCEL SERVERLESS ENVIRONMENT
-// Add a special middleware to handle preflight OPTIONS requests
-app.use((req, res, next) => {
-  // Handle preflight OPTIONS requests
-  if (req.method === 'OPTIONS') {
-    console.log('Handling OPTIONS preflight request');
-    
-    // Get the origin from the request
-    const origin = req.headers.origin;
-    
-    // Set Access-Control-Allow-Origin header
-    if (origin && allowedOrigins.indexOf(origin) !== -1) {
-      res.header('Access-Control-Allow-Origin', origin);
-    } else {
-      // Use wildcard for local development or first allowed origin
-      res.header('Access-Control-Allow-Origin', '*');
-    }
-    
-    // Set all the necessary CORS headers
-    res.header('Access-Control-Allow-Methods', 'GET, HEAD, PUT, PATCH, POST, DELETE, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-    res.header('Access-Control-Allow-Credentials', 'true');
-    res.header('Access-Control-Max-Age', '86400'); // 24 hours cache for preflight
-    
-    // Return 200 OK status for preflight requests
-    return res.status(200).end();
-  }
-  
-  // For non-OPTIONS requests, continue to the next middleware
-  next();
+// ULTRA SIMPLIFIED CORS CONFIGURATION FOR VERCEL
+// Handle OPTIONS requests explicitly (preflight requests)
+app.options('*', (req, res) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Max-Age', '86400'); // 24 hours
+  res.status(200).send();
 });
 
-// Simple CORS middleware that works reliably in Vercel
-app.use(cors({
-  origin: '*', // Allow all origins for now to debug 
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
-  credentials: true
-}));
+// Add CORS headers to all responses
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  next();
+});
 
 // Increase JSON payload size limit and add better error handling
 app.use(express.json({ limit: '10mb' }));

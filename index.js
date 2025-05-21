@@ -8,21 +8,24 @@ const SibApiV3Sdk = require('sib-api-v3-sdk');
 
 const app = express();
 
-// Special handler for OPTIONS preflight requests - this is crucial for Vercel deployment
-app.options('*', (req, res) => {
-  console.log('Handling OPTIONS preflight request');
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-  res.status(200).send();
-});
+// CORS middleware - simplest and most reliable implementation
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization'],
+  credentials: false,
+  preflightContinue: false,
+  optionsSuccessStatus: 204
+}));
 
-// CORS middleware for all other requests
+// Additional explicit OPTIONS handler for Vercel
+app.options('*', cors());
+
+// Add CORS headers to all responses as a backup
 app.use((req, res, next) => {
-  console.log(`${req.method} request to ${req.path}`);
   res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
   next();
 });
 

@@ -1,4 +1,4 @@
-// COMPLETE INDEX.JS WITH CORS CONFIGURATION AND EMAIL FUNCTIONALITYlll
+// COMPLETE INDEX.JS WITH CORS CONFIGURATION AND EMAIL FUNCTIONALITY
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');

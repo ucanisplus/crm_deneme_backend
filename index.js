@@ -47,40 +47,13 @@ app.use((req, res, next) => {
   next();
 });
 
-// Normal CORS middleware for all other requests
+// Simple CORS middleware that works reliably in Vercel
 app.use(cors({
-  origin: function(origin, callback) {
-    // Allow requests with no origin (like mobile apps, curl, etc)
-    if (!origin) return callback(null, true);
-    
-    if (allowedOrigins.indexOf(origin) !== -1) {
-      callback(null, origin); // allow specific origin
-    } else {
-      callback(null, allowedOrigins[0]); // or default to first origin
-    }
-  },
+  origin: '*', // Allow all origins for now to debug 
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
   credentials: true
 }));
-
-// ADDITIONAL CORS HEADERS MIDDLEWARE - ensure headers are always present for Vercel
-app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  
-  // Set CORS headers for every response
-  if (origin && allowedOrigins.indexOf(origin) !== -1) {
-    res.header('Access-Control-Allow-Origin', origin);
-  } else {
-    res.header('Access-Control-Allow-Origin', allowedOrigins[0]);
-  }
-  
-  res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Accept, X-Requested-With');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  
-  next();
-});
 
 // Increase JSON payload size limit and add better error handling
 app.use(express.json({ limit: '10mb' }));
@@ -1623,6 +1596,16 @@ app.get('/api/gal_cost_cal_sequence/next', async (req, res) => {
     console.error('Error getting sequence number:', error);
     res.status(500).json({ error: error.message });
   }
+});
+
+// Add a simple root route for testing
+app.get('/', (req, res) => {
+    res.json({ 
+        status: 'ok', 
+        message: 'Backend is running',
+        cors: 'Enabled with wildcard (*) origin',
+        timestamp: new Date().toISOString()
+    });
 });
 
 // Start server for local development

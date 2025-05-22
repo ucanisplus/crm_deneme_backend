@@ -1,26 +1,35 @@
-// COMPLETE VERSION OF INDEX.JS WITH EMAIL FUNCTIONALITY AND CORS MIDDLEWARE
+// COMPLETE INDEX.JS WITH CORS CONFIGURATION AND EMAIL FUNCTIONALITY
 require('dotenv').config();
 const express = require('express');
 const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 const SibApiV3Sdk = require('sib-api-v3-sdk');
-const cors = require('cors');
 
 const app = express();
 
-// Setup CORS middleware - the proper way
-app.use(cors({
-  origin: '*',  // In production you would restrict this to your frontend domain
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization']
-}));
+// CRITICAL FIX: CORS settings - SINGLE IMPLEMENTATION ONLY
+// FIX: Define allowed origins as an array and check against it instead of using wildcards
+const allowedOrigins = ['https://crm-deneme-1.vercel.app', 'http://localhost:3000'];
 
-// This ensures OPTIONS requests get a 200 response
-app.options('*', cors());
-
-// Request logging middleware
+// Handle preflight OPTIONS requests and set correct CORS headers - SINGLE MIDDLEWARE
 app.use((req, res, next) => {
-  console.log(`${req.method} request to ${req.path}`);
+  const origin = req.headers.origin;
+  
+  // Only set Access-Control-Allow-Origin header if origin is allowed
+  // This is the key fix - only set a single origin rather than multiple origins
+  if (origin && allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Max-Age', '86400');
+  }
+  
+  // Handle preflight OPTIONS requests
+  if (req.method === 'OPTIONS') {
+    return res.status(204).end();
+  }
+  
   next();
 });
 
@@ -36,7 +45,7 @@ app.use((err, req, res, next) => {
       details: err.message
     });
   }
-  next(err); // Pass the error to the next middleware
+  next();
 });
 
 // EMERGENCY FIX: Remove timestamp fields that cause problems
@@ -81,42 +90,18 @@ app.use((req, res, next) => {
   next();
 });
 
-// Database Connection with error handling
-let pool;
-try {
-  pool = new Pool({
+// PostgreSQL Connection
+const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
     ssl: { rejectUnauthorized: false }
-  });
-  console.log('✅ Database connection initialized');
-  
-  // Database error handling
-  pool.on('error', (err) => {
-    console.error('Unexpected database error:', err);
-  });
-} catch (error) {
-  console.error('❌ Failed to initialize database connection:', error);
-  // Create a dummy pool that will return errors for all queries
-  pool = {
-    query: () => Promise.reject(new Error('Database connection not available')),
-    on: () => {},
-    connect: () => Promise.reject(new Error('Database connection not available'))
-  };
-}
+});
 
-// Configure Brevo (Sendinblue) email client
-let apiInstance = null;
-try {
-  const defaultClient = SibApiV3Sdk.ApiClient.instance;
-  const apiKey = defaultClient.authentications['api-key'];
-  apiKey.apiKey = process.env.BREVO_API_KEY;
-  apiInstance = new SibApiV3Sdk.TransactionalEmailsApi();
-  console.log('✅ Brevo API client initialized successfully');
-} catch (error) {
-  console.error('❌ Failed to initialize Brevo API client:', error);
-}
+// Database error handling
+pool.on('error', (err) => {
+  console.error('Unexpected database error:', err);
+});
 
-// Helper function for number formatting
+// Helper function to normalize number format
 const normalizeNumber = (value) => {
   // Return null for null or undefined values
   if (value === null || value === undefined) {
@@ -128,12 +113,12 @@ const normalizeNumber = (value) => {
   }
   
   if (typeof value === 'string') {
-    // Empty string check
+    // Check for empty string
     if (value.trim() === '') {
       return null;
     }
     
-    // Convert commas to dots - with global flag to replace all commas
+    // Convert commas to periods - global flag to replace all commas
     if (value.includes(',')) {
       return parseFloat(value.replace(/,/g, '.'));
     }
@@ -200,6 +185,96 @@ const validateData = (data) => {
   return { valid: true };
 };
 
+// Configure Brevo (Sendinblue) email client
+let apiInstance = null;
+try {
+  const defaultClient = SibApiV3Sdk.ApiClient.instance;
+  const apiKey = defaultClient.authentications['api-key'];
+  apiKey.apiKey = process.env.BREVO_API_KEY;
+  apiInstance = new SibApiV3Sdk.TransactionalEmailsApi();
+  console.log('✅ Brevo API client initialized successfully');
+} catch (error) {
+  console.error('❌ Failed to initialize Brevo API client:', error);
+}
+
+// Email Sending Endpoint
+app.post('/api/send-email-notification', async (req, res) => {
+  console.log('📨 Email notification request received');
+  
+  // Log headers to debug CORS issues
+  console.log('Request Headers:', JSON.stringify(req.headers, null, 2));
+  
+  try {
+    if (!apiInstance) {
+      return res.status(500).json({ error: 'Email client not initialized properly' });
+    }
+    
+    const { to, subject, text, html, from = 'ucanisplus@gmail.com', fromName = 'TLC Metal CRM', cc, bcc, replyTo } = req.body;
+    
+    if (!to || !subject || (!text && !html)) {
+      return res.status(400).json({ error: 'Alıcı (to), konu (subject) ve mesaj içeriği (text veya html) gereklidir' });
+    }
+    
+    // Format recipients correctly
+    const toRecipients = Array.isArray(to) 
+      ? to.map(email => ({ email })) 
+      : [{ email: to }];
+    
+    // Format CC recipients (if provided)
+    const ccRecipients = cc ? (Array.isArray(cc) 
+      ? cc.map(email => ({ email })) 
+      : [{ email: cc }]) : [];
+    
+    // Format BCC recipients (if provided)
+    const bccRecipients = bcc ? (Array.isArray(bcc) 
+      ? bcc.map(email => ({ email })) 
+      : [{ email: bcc }]) : [];
+    
+    // Create email message
+    const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
+    sendSmtpEmail.subject = subject;
+    sendSmtpEmail.htmlContent = html || `<p>${text}</p>`;
+    sendSmtpEmail.sender = { name: fromName, email: from || 'ucanisplus@gmail.com' };
+    sendSmtpEmail.to = toRecipients;
+    
+    // Add optional fields
+    if (ccRecipients.length > 0) sendSmtpEmail.cc = ccRecipients;
+    if (bccRecipients.length > 0) sendSmtpEmail.bcc = bccRecipients;
+    if (replyTo) sendSmtpEmail.replyTo = { email: replyTo };
+    if (text) sendSmtpEmail.textContent = text;
+    
+    console.log('📧 Sending email:', {
+      to: Array.isArray(to) ? to.join(', ') : to,
+      from: from || 'ucanisplus@gmail.com',
+      subject
+    });
+    
+    // Send the email
+    const data = await apiInstance.sendTransacEmail(sendSmtpEmail);
+    
+    console.log('✅ Email sent successfully:', data);
+    res.status(200).json({ success: true, message: 'E-posta başarıyla gönderildi', data });
+  } catch (error) {
+    console.error('❌ Email sending error:', error);
+    
+    // Check for Brevo-specific error messages
+    if (error.response && error.response.body) {
+      console.error('Brevo response error:', error.response.body);
+      
+      return res.status(500).json({ 
+        error: 'E-posta gönderilemedi', 
+        details: error.message,
+        brevoError: error.response.body
+      });
+    }
+    
+    res.status(500).json({ 
+      error: 'E-posta gönderilemedi', 
+      details: error.message 
+    });
+  }
+});
+
 // Test Route
 app.get('/api/test', async (req, res) => {
     try {
@@ -216,6 +291,10 @@ app.get('/api/test', async (req, res) => {
 
 // User Registration Route
 app.post('/api/signup', async (req, res) => {
+    console.log('📋 Signup request received');
+    // Log headers to debug CORS issues
+    console.log('Request Headers:', JSON.stringify(req.headers, null, 2));
+    
     const { username, password, email, role = 'engineer_1' } = req.body;
 
     if (!username || !password || !email) {
@@ -248,6 +327,11 @@ app.post('/api/signup', async (req, res) => {
 
 // User Login
 app.post('/api/login', async (req, res) => {
+    console.log('🔑 Login request received');
+    // Log headers to debug CORS issues
+    console.log('Request Headers:', JSON.stringify(req.headers, null, 2));
+    console.log('Request Body:', JSON.stringify(req.body, null, 2));
+    
     const { username, password } = req.body;
 
     if (!username || !password) {
@@ -283,6 +367,19 @@ app.post('/api/login', async (req, res) => {
         console.error("Giriş hatası:", error);
         res.status(500).json({ error: error.message });
     }
+});
+
+// CORS testing endpoint
+app.get('/api/cors-test', (req, res) => {
+  console.log('CORS test endpoint hit');
+  console.log('Request headers:', req.headers);
+  
+  res.json({ 
+    success: true, 
+    message: 'CORS is working properly', 
+    headers_received: req.headers,
+    timestamp: new Date().toISOString()
+  });
 });
 
 // Get user permissions
@@ -542,81 +639,6 @@ app.post('/api/user/profile-picture', async (req, res) => {
   }
 });
 
-// Email Sending Endpoint
-app.post('/api/send-email-notification', async (req, res) => {
-  console.log('📨 Email notification request received');
-  
-  try {
-    if (!apiInstance) {
-      return res.status(500).json({ error: 'Email client not initialized properly' });
-    }
-    
-    const { to, subject, text, html, from = 'ucanisplus@gmail.com', fromName = 'TLC Metal CRM', cc, bcc, replyTo } = req.body;
-    
-    if (!to || !subject || (!text && !html)) {
-      return res.status(400).json({ error: 'Alıcı (to), konu (subject) ve mesaj içeriği (text veya html) gereklidir' });
-    }
-    
-    // Format recipients correctly
-    const toRecipients = Array.isArray(to) 
-      ? to.map(email => ({ email })) 
-      : [{ email: to }];
-    
-    // Format CC recipients (if provided)
-    const ccRecipients = cc ? (Array.isArray(cc) 
-      ? cc.map(email => ({ email })) 
-      : [{ email: cc }]) : [];
-    
-    // Format BCC recipients (if provided)
-    const bccRecipients = bcc ? (Array.isArray(bcc) 
-      ? bcc.map(email => ({ email })) 
-      : [{ email: bcc }]) : [];
-    
-    // Create email message
-    const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
-    sendSmtpEmail.subject = subject;
-    sendSmtpEmail.htmlContent = html || `<p>${text}</p>`;
-    sendSmtpEmail.sender = { name: fromName, email: from || 'ucanisplus@gmail.com' };
-    sendSmtpEmail.to = toRecipients;
-    
-    // Add optional fields
-    if (ccRecipients.length > 0) sendSmtpEmail.cc = ccRecipients;
-    if (bccRecipients.length > 0) sendSmtpEmail.bcc = bccRecipients;
-    if (replyTo) sendSmtpEmail.replyTo = { email: replyTo };
-    if (text) sendSmtpEmail.textContent = text;
-    
-    console.log('📧 Sending email:', {
-      to: Array.isArray(to) ? to.join(', ') : to,
-      from: from || 'ucanisplus@gmail.com',
-      subject
-    });
-    
-    // Send the email
-    const data = await apiInstance.sendTransacEmail(sendSmtpEmail);
-    
-    console.log('✅ Email sent successfully:', data);
-    res.status(200).json({ success: true, message: 'E-posta başarıyla gönderildi', data });
-  } catch (error) {
-    console.error('❌ Email sending error:', error);
-    
-    // Check for Brevo-specific error messages
-    if (error.response && error.response.body) {
-      console.error('Brevo response error:', error.response.body);
-      
-      return res.status(500).json({ 
-        error: 'E-posta gönderilemedi', 
-        details: error.message,
-        brevoError: error.response.body
-      });
-    }
-    
-    res.status(500).json({ 
-      error: 'E-posta gönderilemedi', 
-      details: error.message 
-    });
-  }
-});
-
 // Existing Tables
 const tables = [
     'panel_cost_cal_currency',
@@ -724,10 +746,7 @@ async function checkAndCreateTable(tableName) {
             tolerans_plus NUMERIC(10, 4),
             tolerans_minus NUMERIC(10, 4),
             shrink VARCHAR(50),
-            unwinding VARCHAR(50),
-            cast_kont VARCHAR(50),
-            helix_kont VARCHAR(50),
-            elongation VARCHAR(50)
+            unwinding VARCHAR(50)
           )
         `;
       } else if (tableName.endsWith('_recete')) {
@@ -827,7 +846,7 @@ async function checkAndCreateTable(tableName) {
       await pool.query(createTableQuery);
       console.log(`Table '${tableName}' created successfully.`);
     } else {
-      // Check for timestamp columns in Panel Çit tables
+      // Check and update timestamp columns for Panel Çit tables
       if (tableName.includes('panel_cit')) {
         // Check if we need to alter the timestamp columns
         const timestampColCheck = await pool.query(`
@@ -1350,7 +1369,7 @@ for (const table of tables) {
             
             const result = await pool.query(query, values);
             if (result.rows.length === 0) {
-                console.error(`❌ Record not found: ${table}, ID: ${id}`);
+                console.error(`❌ Record not found: ${table} (id: ${id})`);
                 return res.status(404).json({ error: "Record not found" });
             }
             
@@ -1574,34 +1593,11 @@ app.get('/api/gal_cost_cal_sequence/next', async (req, res) => {
   }
 });
 
-// CORS diagnostic endpoint
-app.get('/api/cors-test', (req, res) => {
-  res.json({
-    success: true,
-    message: 'CORS is working properly',
-    origin: req.headers.origin || 'No origin header',
-    requestHeaders: req.headers,
-    timestamp: new Date().toISOString()
-  });
-});
-
-// Add simple root route for testing
-app.get('/', (req, res) => {
-  res.json({
-    status: 'ok',
-    message: 'Backend is running correctly',
-    timestamp: new Date().toISOString(),
-    email_status: apiInstance ? 'Email client is configured correctly' : 'Email client not initialized',
-    request_headers: req.headers,
-    cors_enabled: true
-  });
-});
-
 // Start server for local development
 const PORT = process.env.PORT || 4000;
 if (process.env.NODE_ENV !== 'production') {
     app.listen(PORT, () => {
-        console.log(`🚀 Backend running on port ${PORT}`);
+        console.log(`🚀 Backend running on port ${PORT} with fixed CORS`);
     });
 }
 

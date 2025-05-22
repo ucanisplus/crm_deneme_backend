@@ -1,39 +1,21 @@
-// COMPLETE INDEX.JS WITH CORS CONFIGURATION AND EMAIL FUNCTIONALITY
+// COMPLETE FIXED VERSION OF INDEX.JS WITH TIMESTAMP ISSUE RESOLVED
 require('dotenv').config();
 const express = require('express');
+const cors = require('cors');
 const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
-const SibApiV3Sdk = require('sib-api-v3-sdk');
 
 const app = express();
+app.use(cors({
+  origin: '*',  // Geliştirme için - üretime geçerken bu kısıtlanmalıdır
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
+}));
 
-// CRITICAL FIX: CORS settings - SINGLE IMPLEMENTATION ONLY
-// FIX: Define allowed origins as an array and check against it instead of using wildcards
-const allowedOrigins = ['https://crm-deneme-1.vercel.app', 'http://localhost:3000'];
+// CORS Preflight kontrolü için OPTIONS yanıtı
+app.options('*', cors());
 
-// Handle preflight OPTIONS requests and set correct CORS headers - SINGLE MIDDLEWARE
-app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  
-  // Only set Access-Control-Allow-Origin header if origin is allowed
-  // This is the key fix - only set a single origin rather than multiple origins
-  if (origin && allowedOrigins.includes(origin)) {
-    res.header('Access-Control-Allow-Origin', origin);
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept');
-    res.header('Access-Control-Allow-Credentials', 'true');
-    res.header('Access-Control-Max-Age', '86400');
-  }
-  
-  // Handle preflight OPTIONS requests
-  if (req.method === 'OPTIONS') {
-    return res.status(204).end();
-  }
-  
-  next();
-});
-
-// Increase JSON payload size limit
+// Increase JSON payload size limit and add better error handling
 app.use(express.json({ limit: '10mb' }));
 
 // JSON parse error handling middleware
@@ -90,7 +72,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// PostgreSQL Connection
+// PostgreSQL Bağlantısı
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
     ssl: { rejectUnauthorized: false }
@@ -101,9 +83,10 @@ pool.on('error', (err) => {
   console.error('Unexpected database error:', err);
 });
 
-// Helper function to normalize number format
+// Sayı formatını düzenleyen yardımcı fonksiyon - İYİLEŞTİRİLMİŞ
+// Virgül yerine nokta kullanarak sayı formatını düzenler
 const normalizeNumber = (value) => {
-  // Return null for null or undefined values
+  // Null veya undefined değerleri null olarak döndür
   if (value === null || value === undefined) {
     return null;
   }
@@ -113,17 +96,17 @@ const normalizeNumber = (value) => {
   }
   
   if (typeof value === 'string') {
-    // Check for empty string
+    // Boş string kontrolü
     if (value.trim() === '') {
       return null;
     }
     
-    // Convert commas to periods - global flag to replace all commas
+    // Virgülleri noktalara çevir - global flag ile tüm virgülleri değiştir
     if (value.includes(',')) {
       return parseFloat(value.replace(/,/g, '.'));
     }
     
-    // Check if it's a numeric value
+    // Sayısal değer mi kontrol et
     if (!isNaN(parseFloat(value))) {
       return parseFloat(value);
     }
@@ -132,28 +115,28 @@ const normalizeNumber = (value) => {
   return value;
 };
 
-// Helper function to process data - converting comma decimals to period format
+// Verileri işleyen yardımcı fonksiyon - virgüllü sayıları noktalı formata dönüştürür - İYİLEŞTİRİLMİŞ
 const normalizeData = (data) => {
-  // Check for null or undefined values
+  // Null veya undefined değerleri kontrol et
   if (data === null || data === undefined) {
     return null;
   }
   
-  // Process each item if it's an array
+  // Dizi ise her öğeyi işle
   if (Array.isArray(data)) {
     return data.map(item => normalizeData(item));
   }
   
-  // Process each value if it's an object
+  // Nesne ise her değeri işle
   if (typeof data === 'object') {
     const normalizedData = {};
     
     for (const [key, value] of Object.entries(data)) {
-      // Check for empty string
+      // Boş string kontrolü
       if (typeof value === 'string' && value.trim() === '') {
         normalizedData[key] = null;
       }
-      // Process content if value is an object or array
+      // Değer bir nesne veya dizi ise içeriğini de işle
       else if (value !== null && typeof value === 'object') {
         normalizedData[key] = normalizeData(value);
       } else {
@@ -164,11 +147,11 @@ const normalizeData = (data) => {
     return normalizedData;
   }
   
-  // Apply number normalization for all other cases
+  // Diğer tüm durumlar için sayı normalizasyonu uygula
   return normalizeNumber(data);
 };
 
-// Data validation function
+// Veri doğrulama fonksiyonu - YENİ
 const validateData = (data) => {
   if (!data) {
     return { valid: false, error: 'Veri boş olamaz' };
@@ -185,97 +168,7 @@ const validateData = (data) => {
   return { valid: true };
 };
 
-// Configure Brevo (Sendinblue) email client
-let apiInstance = null;
-try {
-  const defaultClient = SibApiV3Sdk.ApiClient.instance;
-  const apiKey = defaultClient.authentications['api-key'];
-  apiKey.apiKey = process.env.BREVO_API_KEY;
-  apiInstance = new SibApiV3Sdk.TransactionalEmailsApi();
-  console.log('✅ Brevo API client initialized successfully');
-} catch (error) {
-  console.error('❌ Failed to initialize Brevo API client:', error);
-}
-
-// Email Sending Endpoint
-app.post('/api/send-email-notification', async (req, res) => {
-  console.log('📨 Email notification request received');
-  
-  // Log headers to debug CORS issues
-  console.log('Request Headers:', JSON.stringify(req.headers, null, 2));
-  
-  try {
-    if (!apiInstance) {
-      return res.status(500).json({ error: 'Email client not initialized properly' });
-    }
-    
-    const { to, subject, text, html, from = 'ucanisplus@gmail.com', fromName = 'TLC Metal CRM', cc, bcc, replyTo } = req.body;
-    
-    if (!to || !subject || (!text && !html)) {
-      return res.status(400).json({ error: 'Alıcı (to), konu (subject) ve mesaj içeriği (text veya html) gereklidir' });
-    }
-    
-    // Format recipients correctly
-    const toRecipients = Array.isArray(to) 
-      ? to.map(email => ({ email })) 
-      : [{ email: to }];
-    
-    // Format CC recipients (if provided)
-    const ccRecipients = cc ? (Array.isArray(cc) 
-      ? cc.map(email => ({ email })) 
-      : [{ email: cc }]) : [];
-    
-    // Format BCC recipients (if provided)
-    const bccRecipients = bcc ? (Array.isArray(bcc) 
-      ? bcc.map(email => ({ email })) 
-      : [{ email: bcc }]) : [];
-    
-    // Create email message
-    const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
-    sendSmtpEmail.subject = subject;
-    sendSmtpEmail.htmlContent = html || `<p>${text}</p>`;
-    sendSmtpEmail.sender = { name: fromName, email: from || 'ucanisplus@gmail.com' };
-    sendSmtpEmail.to = toRecipients;
-    
-    // Add optional fields
-    if (ccRecipients.length > 0) sendSmtpEmail.cc = ccRecipients;
-    if (bccRecipients.length > 0) sendSmtpEmail.bcc = bccRecipients;
-    if (replyTo) sendSmtpEmail.replyTo = { email: replyTo };
-    if (text) sendSmtpEmail.textContent = text;
-    
-    console.log('📧 Sending email:', {
-      to: Array.isArray(to) ? to.join(', ') : to,
-      from: from || 'ucanisplus@gmail.com',
-      subject
-    });
-    
-    // Send the email
-    const data = await apiInstance.sendTransacEmail(sendSmtpEmail);
-    
-    console.log('✅ Email sent successfully:', data);
-    res.status(200).json({ success: true, message: 'E-posta başarıyla gönderildi', data });
-  } catch (error) {
-    console.error('❌ Email sending error:', error);
-    
-    // Check for Brevo-specific error messages
-    if (error.response && error.response.body) {
-      console.error('Brevo response error:', error.response.body);
-      
-      return res.status(500).json({ 
-        error: 'E-posta gönderilemedi', 
-        details: error.message,
-        brevoError: error.response.body
-      });
-    }
-    
-    res.status(500).json({ 
-      error: 'E-posta gönderilemedi', 
-      details: error.message 
-    });
-  }
-});
-
-// Test Route
+// Test Rotası
 app.get('/api/test', async (req, res) => {
     try {
         const result = await pool.query("SELECT NOW()");
@@ -289,12 +182,8 @@ app.get('/api/test', async (req, res) => {
     }
 });
 
-// User Registration Route
+// Kullanıcı Kayıt Rotası
 app.post('/api/signup', async (req, res) => {
-    console.log('📋 Signup request received');
-    // Log headers to debug CORS issues
-    console.log('Request Headers:', JSON.stringify(req.headers, null, 2));
-    
     const { username, password, email, role = 'engineer_1' } = req.body;
 
     if (!username || !password || !email) {
@@ -302,17 +191,17 @@ app.post('/api/signup', async (req, res) => {
     }
 
     try {
-        // Check if user already exists
+        // Kullanıcı zaten var mı kontrol et
         const existingUser = await pool.query('SELECT * FROM crm_users WHERE username = $1 OR email = $2', [username, email]);
         
         if (existingUser.rows.length > 0) {
             return res.status(400).json({ error: 'Kullanıcı adı veya email zaten kullanılıyor' });
         }
 
-        // Hash the password
+        // Şifreyi hash'le
         const hashedPassword = await bcrypt.hash(password, 10);
 
-        // Create user with UUID
+        // UUID ile kullanıcı oluştur
         const result = await pool.query(
             'INSERT INTO crm_users (id, username, password, email, role, created_at) VALUES (uuid_generate_v4(), $1, $2, $3, $4, NOW()) RETURNING id, username, email, role',
             [username, hashedPassword, email, role]
@@ -325,13 +214,8 @@ app.post('/api/signup', async (req, res) => {
     }
 });
 
-// User Login
+// Kullanıcı Girişi
 app.post('/api/login', async (req, res) => {
-    console.log('🔑 Login request received');
-    // Log headers to debug CORS issues
-    console.log('Request Headers:', JSON.stringify(req.headers, null, 2));
-    console.log('Request Body:', JSON.stringify(req.body, null, 2));
-    
     const { username, password } = req.body;
 
     if (!username || !password) {
@@ -339,7 +223,7 @@ app.post('/api/login', async (req, res) => {
     }
 
     try {
-        // Find user by username
+        // Kullanıcı adına göre kullanıcıyı bul
         const result = await pool.query('SELECT * FROM crm_users WHERE username = $1', [username]);
 
         if (result.rows.length === 0) {
@@ -348,7 +232,7 @@ app.post('/api/login', async (req, res) => {
 
         const user = result.rows[0];
 
-        // Compare password with hashed password
+        // Şifreyi hash'lenmiş şifre ile karşılaştır
         const passwordMatch = await bcrypt.compare(password, user.password);
         if (!passwordMatch) {
             return res.status(400).json({ error: 'Geçersiz kullanıcı adı veya şifre' });
@@ -369,20 +253,7 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
-// CORS testing endpoint
-app.get('/api/cors-test', (req, res) => {
-  console.log('CORS test endpoint hit');
-  console.log('Request headers:', req.headers);
-  
-  res.json({ 
-    success: true, 
-    message: 'CORS is working properly', 
-    headers_received: req.headers,
-    timestamp: new Date().toISOString()
-  });
-});
-
-// Get user permissions
+// Kullanıcı izinlerini getir
 app.get('/api/user/permissions/:userId', async (req, res) => {
     try {
         const { userId } = req.params;
@@ -407,7 +278,7 @@ app.get('/api/user/permissions/:userId', async (req, res) => {
     }
 });
 
-// Get all users (for admin panel)
+// Tüm kullanıcıları getir (admin panel için)
 app.get('/api/users', async (req, res) => {
     try {
         const result = await pool.query(`
@@ -423,13 +294,13 @@ app.get('/api/users', async (req, res) => {
     }
 });
 
-// Update user
+// Kullanıcı güncelle
 app.put('/api/users/:userId', async (req, res) => {
     try {
         const { userId } = req.params;
         const { username, email, role } = req.body;
         
-        // Don't allow password updates through this endpoint
+        // Bu endpoint üzerinden şifre güncellemesine izin verme
         const result = await pool.query(`
             UPDATE crm_users 
             SET username = $1, email = $2, role = $3
@@ -448,7 +319,7 @@ app.put('/api/users/:userId', async (req, res) => {
     }
 });
 
-// Delete user
+// Kullanıcı sil
 app.delete('/api/users/:userId', async (req, res) => {
     try {
         const { userId } = req.params;
@@ -470,7 +341,7 @@ app.delete('/api/users/:userId', async (req, res) => {
     }
 });
 
-// Add user permission
+// Kullanıcı izni ekle
 app.post('/api/user-permissions', async (req, res) => {
     try {
         const { role, permission_name } = req.body;
@@ -479,7 +350,7 @@ app.post('/api/user-permissions', async (req, res) => {
             return res.status(400).json({ error: 'Gerekli alanlar eksik' });
         }
         
-        // Check if permission already exists
+        // İzin zaten var mı kontrol et
         const existingPermission = await pool.query(
             'SELECT * FROM user_permissions WHERE role = $1 AND permission_name = $2',
             [role, permission_name]
@@ -501,7 +372,7 @@ app.post('/api/user-permissions', async (req, res) => {
     }
 });
 
-// Get all permissions
+// Tüm izinleri getir
 app.get('/api/user-permissions', async (req, res) => {
     try {
         const result = await pool.query('SELECT * FROM user_permissions ORDER BY role, permission_name');
@@ -512,7 +383,7 @@ app.get('/api/user-permissions', async (req, res) => {
     }
 });
 
-// Delete permission
+// İzin sil
 app.delete('/api/user-permissions/:id', async (req, res) => {
     try {
         const { id } = req.params;
@@ -533,7 +404,7 @@ app.delete('/api/user-permissions/:id', async (req, res) => {
     }
 });
 
-// Change password
+// Şifre değiştir
 app.post('/api/change-password', async (req, res) => {
     try {
         const { userId, currentPassword, newPassword } = req.body;
@@ -542,7 +413,7 @@ app.post('/api/change-password', async (req, res) => {
             return res.status(400).json({ error: 'Gerekli alanlar eksik' });
         }
         
-        // Get the user
+        // Kullanıcıyı getir
         const userResult = await pool.query('SELECT * FROM crm_users WHERE id = $1', [userId]);
         
         if (userResult.rows.length === 0) {
@@ -551,13 +422,13 @@ app.post('/api/change-password', async (req, res) => {
         
         const user = userResult.rows[0];
         
-        // Verify current password
+        // Mevcut şifreyi doğrula
         const passwordMatch = await bcrypt.compare(currentPassword, user.password);
         if (!passwordMatch) {
             return res.status(400).json({ error: 'Mevcut şifre yanlış' });
         }
         
-        // Hash and update the new password
+        // Yeni şifreyi hashle ve güncelle
         const hashedNewPassword = await bcrypt.hash(newPassword, 10);
         
         await pool.query(
@@ -572,7 +443,7 @@ app.post('/api/change-password', async (req, res) => {
     }
 });
 
-// Get profile picture
+// Profil resmi getir
 app.get('/api/user/profile-picture', async (req, res) => {
   try {
     const { username } = req.query;
@@ -581,7 +452,7 @@ app.get('/api/user/profile-picture', async (req, res) => {
       return res.status(400).json({ error: 'Kullanıcı adı gerekli' });
     }
     
-    // Table name profile_pictures (with underscore)
+    // Tablo adı profile_pictures (alt çizgi ile)
     const result = await pool.query(`
       SELECT * FROM profile_pictures 
       WHERE username = $1
@@ -598,7 +469,7 @@ app.get('/api/user/profile-picture', async (req, res) => {
   }
 });
 
-// Create or update profile picture
+// Profil resmi oluştur veya güncelle
 app.post('/api/user/profile-picture', async (req, res) => {
   try {
     const { username, pp_url } = req.body;
@@ -607,7 +478,7 @@ app.post('/api/user/profile-picture', async (req, res) => {
       return res.status(400).json({ error: 'Kullanıcı adı ve profil resmi URL\'si gerekli' });
     }
     
-    // Check if profile picture already exists for the user
+    // Kullanıcı için profil resmi zaten var mı kontrol et
     const existingPP = await pool.query(`
       SELECT * FROM profile_pictures 
       WHERE username = $1
@@ -616,7 +487,7 @@ app.post('/api/user/profile-picture', async (req, res) => {
     let result;
     
     if (existingPP.rows.length > 0) {
-      // Update existing profile picture
+      // Mevcut profil resmini güncelle
       result = await pool.query(`
         UPDATE profile_pictures 
         SET pp_url = $1 
@@ -624,7 +495,7 @@ app.post('/api/user/profile-picture', async (req, res) => {
         RETURNING *
       `, [pp_url, username]);
     } else {
-      // Create new profile picture entry
+      // Yeni profil resmi girişi oluştur
       result = await pool.query(`
         INSERT INTO profile_pictures (id, username, pp_url) 
         VALUES (uuid_generate_v4(), $1, $2) 
@@ -639,7 +510,7 @@ app.post('/api/user/profile-picture', async (req, res) => {
   }
 });
 
-// Existing Tables
+// Mevcut Tablolar
 const tables = [
     'panel_cost_cal_currency',
     'panel_cost_cal_gecici_hesaplar',
@@ -650,7 +521,7 @@ const tables = [
     'panel_cost_cal_profil_degiskenler',
     'panel_cost_cal_statik_degiskenler',
 
-    // Galvanizli Tel tables
+    // Galvanizli Tel tabloları
     'gal_cost_cal_mm_gt',
     'gal_cost_cal_ym_gt',
     'gal_cost_cal_ym_st',
@@ -659,15 +530,15 @@ const tables = [
     'gal_cost_cal_ym_st_recete',
     'gal_cost_cal_mm_gt_ym_st',
     'gal_cost_cal_sequence',
-    'gal_cost_cal_sal_requests', // Requests table
-    'gal_cost_cal_user_input_values', // User input values for calculations
-    'gal_cost_cal_user_tlc_hizlar' // TLC speeds table
+    'gal_cost_cal_sal_requests', // Talepler tablosu
+    'gal_cost_cal_user_input_values', // Hesaplama değerleri için kullanıcı girdileri
+    'gal_cost_cal_user_tlc_hizlar' // TLC Hızlar tablosu için
 ];
 
-// Check if table exists, create if it doesn't
+// Tablo varlığını kontrol et, yoksa oluştur
 async function checkAndCreateTable(tableName) {
   try {
-    // Check if table exists
+    // Tablo var mı kontrol et
     const checkResult = await pool.query(`
       SELECT EXISTS (
         SELECT FROM information_schema.tables 
@@ -677,11 +548,11 @@ async function checkAndCreateTable(tableName) {
     `, [tableName]);
     
     if (!checkResult.rows[0].exists) {
-      console.log(`Table '${tableName}' not found, creating...`);
+      console.log(`Tablo '${tableName}' bulunamadı, oluşturuluyor...`);
       
       let createTableQuery = '';
       
-      // Create based on table type
+      // Tablo tipine göre oluştur
       if (tableName === 'gal_cost_cal_user_input_values') {
         createTableQuery = `
           CREATE TABLE ${tableName} (
@@ -750,7 +621,7 @@ async function checkAndCreateTable(tableName) {
           )
         `;
       } else if (tableName.endsWith('_recete')) {
-        // Recipe tables
+        // Reçete tabloları
         createTableQuery = `
           CREATE TABLE ${tableName} (
             id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -775,7 +646,7 @@ async function checkAndCreateTable(tableName) {
           )
         `;
       } else if (tableName === 'gal_cost_cal_mm_gt_ym_st') {
-        // MM GT - YM ST relationship table
+        // MM GT - YM ST ilişki tablosu
         createTableQuery = `
           CREATE TABLE ${tableName} (
             id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -788,7 +659,7 @@ async function checkAndCreateTable(tableName) {
           )
         `;
       } else {
-        // General tables - using TIMESTAMP WITH TIME ZONE for all tables
+        // Genel tablolar - tüm tablolarda TIMESTAMP WITH TIME ZONE kullanıyoruz
         createTableQuery = `
           CREATE TABLE ${tableName} (
             id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -844,9 +715,9 @@ async function checkAndCreateTable(tableName) {
       }
       
       await pool.query(createTableQuery);
-      console.log(`Table '${tableName}' created successfully.`);
+      console.log(`Tablo '${tableName}' başarıyla oluşturuldu.`);
     } else {
-      // Check and update timestamp columns for Panel Çit tables
+      // Panel Çit tabloları için timestamp kontrolü yapıp timestamptz'ye güncelleme
       if (tableName.includes('panel_cit')) {
         // Check if we need to alter the timestamp columns
         const timestampColCheck = await pool.query(`
@@ -859,61 +730,61 @@ async function checkAndCreateTable(tableName) {
         
         // If there are timestamp columns without timezone, alter them
         if (timestampColCheck.rows.length > 0) {
-          console.log(`⚠️ Found timestamp fields without timezone in ${tableName}. Updating...`);
+          console.log(`⚠️ ${tableName} tablosunda timezone olmayan tarih alanları bulundu. Güncelleniyor...`);
           
           // Alter each column using a transaction
           await pool.query('BEGIN');
           try {
             for (const row of timestampColCheck.rows) {
-              console.log(`🔄 Updating ${row.column_name} field...`);
+              console.log(`🔄 ${row.column_name} alanı güncelleniyor...`);
               
               await pool.query(`
                 ALTER TABLE ${tableName} 
                 ALTER COLUMN ${row.column_name} TYPE TIMESTAMP WITH TIME ZONE
               `);
               
-              console.log(`✅ Field ${row.column_name} updated successfully.`);
+              console.log(`✅ ${row.column_name} alanı başarıyla güncellendi.`);
             }
             
             await pool.query('COMMIT');
-            console.log(`✅ All date fields in ${tableName} table updated to TIMESTAMP WITH TIME ZONE.`);
+            console.log(`✅ ${tableName} tablosundaki tüm tarih alanları TIMESTAMP WITH TIME ZONE tipine güncellendi.`);
           } catch (error) {
             await pool.query('ROLLBACK');
-            console.error(`❌ Error updating date fields in ${tableName} table:`, error);
+            console.error(`❌ ${tableName} tablosundaki tarih alanları güncellenirken hata oluştu:`, error);
           }
         }
       }
     }
   } catch (error) {
-    console.error(`Table check/creation error (${tableName}):`, error);
+    console.error(`Tablo kontrol/oluşturma hatası (${tableName}):`, error);
     throw error;
   }
 }
 
-// Check all tables when the application starts
+// Uygulama başladığında tüm tabloları kontrol et
 async function checkAllTables() {
   try {
-    console.log("Checking tables...");
+    console.log("Tablolar kontrol ediliyor...");
     for (const tableName of tables) {
       await checkAndCreateTable(tableName);
     }
-    console.log("All tables checked and created/updated if necessary.");
+    console.log("Tüm tablolar kontrol edildi ve gerekirse oluşturuldu/güncellendi.");
   } catch (error) {
-    console.error("Table check error:", error);
+    console.error("Tablo kontrol hatası:", error);
   }
 }
 
-// Check tables when application starts
+// Uygulama başlatıldığında tabloları kontrol et
 checkAllTables();
 
-// Insert default calculation values on first run
+// İlk çalıştırmada varsayılan hesaplama değerlerini ekle
 async function insertDefaultUserInputValues() {
   try {
-    // Add default values if no records exist
+    // Eğer hiç kayıt yoksa varsayılan değerleri ekle
     const existingValues = await pool.query('SELECT COUNT(*) FROM gal_cost_cal_user_input_values');
     
     if (parseInt(existingValues.rows[0].count) === 0) {
-      console.log('Adding default calculation values...');
+      console.log('Varsayılan hesaplama değerleri ekleniyor...');
       
       await pool.query(`
         INSERT INTO gal_cost_cal_user_input_values 
@@ -921,28 +792,28 @@ async function insertDefaultUserInputValues() {
         VALUES (5.54, 2.73, 2800, 30000, 3.08, 10)
       `);
       
-      console.log('✅ Default calculation values added successfully');
+      console.log('✅ Varsayılan hesaplama değerleri başarıyla eklendi');
     }
   } catch (error) {
-    console.error('❌ Error adding default calculation values:', error);
+    console.error('❌ Varsayılan hesaplama değerleri eklenirken hata:', error);
   }
 }
 
-// Add default values after tables are created
+// Tablolar oluşturulduktan sonra varsayılan değerleri ekle
 setTimeout(insertDefaultUserInputValues, 5000);
 
-// General GET Route for Data Retrieval - with improved error handling
+// Veri Getirmek için Genel GET Rotası - İyileştirilmiş hata işleme ile
 for (const table of tables) {
     app.get(`/api/${table}`, async (req, res) => {
         try {
-            // Get query parameters from URL
+            // URL'den sorgu parametrelerini al
             const { id, mm_gt_id, ym_gt_id, ym_st_id, kod_2, cap, stok_kodu, stok_kodu_like, ids, status, created_by } = req.query;
             
             let query = `SELECT * FROM ${table}`;
             const queryParams = [];
             let whereConditions = [];
             
-            // Build WHERE conditions based on query parameters
+            // Sorgu parametrelerine göre WHERE koşullarını oluştur
             if (id) {
                 whereConditions.push(`id = $${queryParams.length + 1}`);
                 queryParams.push(id);
@@ -967,9 +838,9 @@ for (const table of tables) {
                 whereConditions.push(`kod_2 = $${queryParams.length + 1}`);
                 queryParams.push(kod_2);
                 
-                // Convert comma decimals to dot format
+                // Virgüllü değer varsa noktaya çevir
                 const normalizedCap = typeof cap === 'string' && cap.includes(',') 
-                    ? parseFloat(cap.replace(/,/g, '.')) // Global flag to replace all commas
+                    ? parseFloat(cap.replace(/,/g, '.')) // Global flag ile tüm virgülleri değiştir
                     : parseFloat(cap);
                 
                 whereConditions.push(`cap = $${queryParams.length + 1}`);
@@ -981,59 +852,59 @@ for (const table of tables) {
                 queryParams.push(stok_kodu);
             }
             
-            // Pattern search with LIKE operator
+            // Pattern arama için LIKE operatörü
             if (stok_kodu_like) {
                 whereConditions.push(`stok_kodu LIKE $${queryParams.length + 1}`);
                 queryParams.push(`${stok_kodu_like}%`);
             }
             
-            // Multiple ID search
+            // Çoklu ID araması için
             if (ids) {
                 const idList = ids.split(',');
                 whereConditions.push(`id IN (${idList.map((_, i) => `$${queryParams.length + 1 + i}`).join(', ')})`);
                 idList.forEach(id => queryParams.push(id));
             }
             
-            // Request status filtering
+            // Talep durumu filtreleme
             if (status && table === 'gal_cost_cal_sal_requests') {
                 whereConditions.push(`status = $${queryParams.length + 1}`);
                 queryParams.push(status);
             }
             
-            // User filtering
+            // Kullanıcı filtreleme
             if (created_by && table === 'gal_cost_cal_sal_requests') {
                 whereConditions.push(`created_by = $${queryParams.length + 1}`);
                 queryParams.push(created_by);
             }
             
-            // Add WHERE conditions
+            // WHERE koşullarını ekle
             if (whereConditions.length > 0) {
                 query += ` WHERE ${whereConditions.join(' AND ')}`;
             }
             
-            // Add sorting
+            // Sıralama ekle
             if (table === 'gal_cost_cal_sal_requests') {
                 query += ` ORDER BY created_at DESC`;
             }
             
-            console.log(`🔍 Query for ${table}:`, query);
-            console.log("📝 Parameters:", queryParams);
+            console.log(`🔍 ${table} için sorgu:`, query);
+            console.log("📝 Parametreler:", queryParams);
             
             const result = await pool.query(query, queryParams);
             
-            // API consistency: Always return an array, empty array for no results
+            // API tutarlılığı: Her zaman dizi döndür, boş sonuç için boş dizi
             res.json(result.rows);
         } catch (error) {
-            console.error(`Error getting data from ${table} table:`, error);
+            console.error(`${table} tablosundan veri getirme hatası:`, error);
             
-            // For recipe tables, return empty array on 404 error
+            // Reçete tabloları için 404 hatası durumunda boş bir dizi döndür
             if (table.endsWith('_recete')) {
-                console.log(`⚠️ No data found in ${table} table - returning empty array`);
+                console.log(`⚠️ ${table} tablosundan veri bulunamadı - boş dizi döndürülüyor`);
                 return res.json([]);
             }
             
             res.status(500).json({ 
-              error: `Failed to get data from ${table} table`,
+              error: `${table} tablosundan veri getirme başarısız`,
               details: error.message,
               code: error.code
             });
@@ -1041,7 +912,7 @@ for (const table of tables) {
     });
 }
 
-// Get request count
+// Talep sayısını getir
 app.get('/api/gal_cost_cal_sal_requests/count', async (req, res) => {
   try {
     const { status, created_by } = req.query;
@@ -1066,12 +937,12 @@ app.get('/api/gal_cost_cal_sal_requests/count', async (req, res) => {
     const result = await pool.query(query, queryParams);
     res.json({ count: parseInt(result.rows[0].count) });
   } catch (error) {
-    console.error('Error getting request count:', error);
-    res.status(500).json({ error: 'Failed to get request count' });
+    console.error('Talep sayısı alma hatası:', error);
+    res.status(500).json({ error: 'Talep sayısı alınamadı' });
   }
 });
 
-// Approve request
+// Talep onaylama
 app.put('/api/gal_cost_cal_sal_requests/:id/approve', async (req, res) => {
   try {
     const { id } = req.params;
@@ -1087,24 +958,24 @@ app.put('/api/gal_cost_cal_sal_requests/:id/approve', async (req, res) => {
     const result = await pool.query(query, [processed_by, id]);
     
     if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Request not found' });
+      return res.status(404).json({ error: 'Talep bulunamadı' });
     }
     
     res.json(result.rows[0]);
   } catch (error) {
-    console.error('Error approving request:', error);
-    res.status(500).json({ error: 'Could not approve request: ' + error.message });
+    console.error('Talep onaylama hatası:', error);
+    res.status(500).json({ error: 'Talep onaylanamadı: ' + error.message });
   }
 });
 
-// Reject request
+// Talep reddetme
 app.put('/api/gal_cost_cal_sal_requests/:id/reject', async (req, res) => {
   try {
     const { id } = req.params;
     const { processed_by, rejection_reason } = req.body;
     
     if (!rejection_reason) {
-      return res.status(400).json({ error: 'Rejection reason is required' });
+      return res.status(400).json({ error: 'Reddetme sebebi gereklidir' });
     }
     
     const query = `
@@ -1117,38 +988,38 @@ app.put('/api/gal_cost_cal_sal_requests/:id/reject', async (req, res) => {
     const result = await pool.query(query, [processed_by, rejection_reason, id]);
     
     if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Request not found' });
+      return res.status(404).json({ error: 'Talep bulunamadı' });
     }
     
     res.json(result.rows[0]);
   } catch (error) {
-    console.error('Error rejecting request:', error);
-    res.status(500).json({ error: 'Could not reject request: ' + error.message });
+    console.error('Talep reddetme hatası:', error);
+    res.status(500).json({ error: 'Talep reddedilemedi: ' + error.message });
   }
 });
 
-// Check if recipes are complete
+// Özel API: MMGT ve YMGT ID ile reçetelerin tam olup olmadığını kontrol eder
 app.get('/api/check-recipes', async (req, res) => {
   try {
     const { mm_gt_id, ym_gt_id } = req.query;
     
     if (!mm_gt_id || !ym_gt_id) {
-      return res.status(400).json({ error: 'mm_gt_id and ym_gt_id are required' });
+      return res.status(400).json({ error: 'mm_gt_id ve ym_gt_id zorunludur' });
     }
     
-    // 1. Check MMGT recipes
+    // 1. MMGT reçetelerini kontrol et
     const mmGtRecipes = await pool.query('SELECT COUNT(*) FROM gal_cost_cal_mm_gt_recete WHERE mm_gt_id = $1', [mm_gt_id]);
     
-    // 2. Check YMGT recipes
+    // 2. YMGT reçetelerini kontrol et
     const ymGtRecipes = await pool.query('SELECT COUNT(*) FROM gal_cost_cal_ym_gt_recete WHERE ym_gt_id = $1', [ym_gt_id]);
     
-    // Find MMGT product (for stok_kodu)
+    // MMGT ürününün kendisini bul (stok_kodu için)
     const mmGtProduct = await pool.query('SELECT stok_kodu FROM gal_cost_cal_mm_gt WHERE id = $1', [mm_gt_id]);
     
-    // Find YMGT product (for stok_kodu)
+    // YMGT ürününün kendisini bul (stok_kodu için)
     const ymGtProduct = await pool.query('SELECT stok_kodu FROM gal_cost_cal_ym_gt WHERE id = $1', [ym_gt_id]);
     
-    // Check the relationship
+    // İlişkiyi kontrol et
     const relation = await pool.query(`
       SELECT ym_st_id FROM gal_cost_cal_mm_gt_ym_st 
       WHERE mm_gt_id = $1 
@@ -1157,7 +1028,7 @@ app.get('/api/check-recipes', async (req, res) => {
     
     const mainYmStId = relation.rows.length > 0 ? relation.rows[0].ym_st_id : null;
     
-    // Check YMST recipes
+    // YMST reçetelerini kontrol et
     let ymStRecipes = 0;
     if (mainYmStId) {
       const ymStResult = await pool.query('SELECT COUNT(*) FROM gal_cost_cal_ym_st_recete WHERE ym_st_id = $1', [mainYmStId]);
@@ -1181,42 +1052,42 @@ app.get('/api/check-recipes', async (req, res) => {
       )
     });
   } catch (error) {
-    console.error('Error checking recipes:', error);
+    console.error('Reçete kontrol hatası:', error);
     res.status(500).json({ 
-      error: 'Error checking recipes',
+      error: 'Reçeteler kontrol edilirken hata oluştu',
       details: error.message
     });
   }
 });
 
-// General POST Route for Data Addition - with improved recipe handling
+// Veri Eklemek için Genel POST Rotası - İyileştirilmiş reçete ekleme desteği ile
 for (const table of tables) {
     app.post(`/api/${table}`, async (req, res) => {
         try {
             let data = req.body;
             
-            // Data validation
+            // Veri doğrulama
             const validation = validateData(data);
             if (!validation.valid) {
-              console.error(`❌ Data validation error for ${table}:`, validation.error);
+              console.error(`❌ ${table} için veri doğrulama hatası:`, validation.error);
               return res.status(400).json({ error: validation.error });
             }
             
-            // Check if incoming data is an array
+            // Gelen veri bir dizi mi kontrol et
             if (Array.isArray(data)) {
-                console.log(`📥 Adding array data to ${table} table (${data.length} items)`);
+                console.log(`📥 ${table} tablosuna dizi veri ekleniyor (${data.length} öğe)`);
                 
-                // Process each item separately
+                // Her bir öğeyi ayrı ayrı işle
                 const results = [];
                 
                 for (const item of data) {
                     try {
-                      // Normalize numeric values (convert commas to periods)
+                      // Sayı değerlerini normalize et (virgülleri noktalara çevir)
                       const normalizedItem = normalizeData(item);
                       
-                      // Skip if empty
+                      // Boş değilse devam et
                       if (!normalizedItem || Object.keys(normalizedItem).length === 0) {
-                        console.warn(`⚠️ Skipping empty item:`, item);
+                        console.warn(`⚠️ Boş öğe atlanıyor:`, item);
                         continue;
                       }
                       
@@ -1226,29 +1097,29 @@ for (const table of tables) {
                       
                       const query = `INSERT INTO ${table} (${columns}) VALUES (${placeholders}) RETURNING *`;
                       
-                      console.log(`📥 Adding: ${table} (array item)`);
+                      console.log(`📥 Ekleniyor: ${table} (dizi öğesi)`);
                       
                       const result = await pool.query(query, values);
                       results.push(result.rows[0]);
                     } catch (itemError) {
-                      console.error(`❌ Item addition error:`, itemError);
-                      // Continue with other items even if one fails
+                      console.error(`❌ Öğe ekleme hatası:`, itemError);
+                      // Hata olduğunda diğer öğeleri etkilememek için devam et
                       results.push({ error: itemError.message, item });
                     }
                 }
                 
                 if (results.length === 0) {
-                  return res.status(400).json({ error: 'No valid items could be added' });
+                  return res.status(400).json({ error: 'Hiçbir geçerli öğe eklenemedi' });
                 }
                 
                 res.status(201).json(results);
             } else {
-                // Normalize numeric values (convert commas to periods)
+                // Sayı değerlerini normalize et (virgülleri noktalara çevir)
                 data = normalizeData(data);
                 
-                // Check if data is empty after normalization
+                // Veri onaylandıktan sonra boş olabilir mi kontrol et
                 if (!data || Object.keys(data).length === 0) {
-                  return res.status(400).json({ error: 'Empty data after normalization' });
+                  return res.status(400).json({ error: 'Normalleştirmeden sonra boş veri kaldı' });
                 }
                 
                 const columns = Object.keys(data).join(', ');
@@ -1257,72 +1128,72 @@ for (const table of tables) {
                 
                 const query = `INSERT INTO ${table} (${columns}) VALUES (${placeholders}) RETURNING *`;
                 
-                console.log(`📥 Adding: ${table}`);
-                console.log("🧾 Columns:", columns);
+                console.log(`📥 Ekleniyor: ${table}`);
+                console.log("🧾 Sütunlar:", columns);
                 
                 try {
                   const result = await pool.query(query, values);
                   
-                  // Special log for recipe additions
+                  // Reçete ekleme ise özel log
                   if (table.endsWith('_recete')) {
-                    console.log(`✅ Recipe added successfully: ${table}, ID: ${result.rows[0].id}`);
+                    console.log(`✅ Reçete başarıyla eklendi: ${table}, ID: ${result.rows[0].id}`);
                   }
                   
                   res.status(201).json(result.rows[0]);
                 } catch (insertError) {
-                  // Special error handling for recipe tables
+                  // Reçete tabloları için özel hata işleme
                   if (table.endsWith('_recete')) {
-                    console.error(`❌ Error adding recipe: ${insertError.message}`);
+                    console.error(`❌ Reçete eklenirken hata: ${insertError.message}`);
                     
-                    // Return user-friendly error message
+                    // Kullanıcıya daha dostu bir hata mesajı döndür
                     if (insertError.code === '23502') {  // not-null constraint
                       return res.status(400).json({ 
-                        error: 'Missing required fields for recipe',
+                        error: 'Reçete için gerekli alanlar eksik',
                         details: insertError.detail || insertError.message 
                       });
                     } else if (insertError.code === '23505') {  // unique constraint
                       return res.status(409).json({
-                        error: 'This recipe already exists',
+                        error: 'Bu reçete zaten mevcut',
                         details: insertError.detail || insertError.message
                       });
                     } else {
                       return res.status(500).json({
-                        error: 'Error adding recipe',
+                        error: 'Reçete eklenirken bir hata oluştu',
                         details: insertError.message
                       });
                     }
                   }
                   
-                  throw insertError; // Continue with normal error handling for other tables
+                  throw insertError; // Diğer tüm tablolar için normal hata işlemeye devam et
                 }
             }
         } catch (error) {
-            console.error(`❌ Failed to add to '${table}' table:`, error);
-            console.error("🧾 Data:", req.body);
+            console.error(`❌ '${table}' tablosuna ekleme başarısız:`, error);
+            console.error("🧾 Veri:", req.body);
             
-            // More detailed error responses
+            // Daha detaylı hata yanıtları
             if (error.code === '23505') {
               return res.status(409).json({ 
-                error: 'Record already exists',
+                error: 'Aynı kayıt zaten var',
                 details: error.detail || error.message,
                 code: error.code
               });
             } else if (error.code === '22P02') {
               return res.status(400).json({ 
-                error: 'Invalid data type',
+                error: 'Geçersiz veri tipi',
                 details: error.message,
                 code: error.code
               });
             } else if (error.code === '23502') {
               return res.status(400).json({ 
-                error: 'Missing required field',
+                error: 'Zorunlu alan eksik',
                 details: error.message,
                 code: error.code
               });
             }
             
             res.status(500).json({ 
-                error: `Could not add data to ${table} table`,
+                error: `${table} tablosuna veri eklenemedi`,
                 details: error.message,
                 code: error.code,
                 stack: error.stack
@@ -1331,7 +1202,7 @@ for (const table of tables) {
     });
 }
 
-// General PUT Route for Data Update
+// Veri Güncellemek için Genel PUT Rotası
 for (const table of tables) {
     app.put(`/api/${table}/:id`, async (req, res) => {
         try {
@@ -1341,20 +1212,20 @@ for (const table of tables) {
             console.log(`🔄 PUT Request to ${table}/${id}`);
             console.log("🧾 Request Body:", JSON.stringify(req.body));
             
-            // Data validation
+            // Veri doğrulama
             const validation = validateData(req.body);
             if (!validation.valid) {
-              console.error(`❌ Data validation error for ${table}:`, validation.error);
+              console.error(`❌ ${table} için veri doğrulama hatası:`, validation.error);
               return res.status(400).json({ error: validation.error });
             }
             
-            // Normalize numeric values (convert commas to periods)
+            // Sayı değerlerini normalize et (virgülleri noktalara çevir)
             let data = normalizeData(req.body);
             
-            // Check if data is empty
+            // Eğer data boş ise hata döndür
             if (!data || Object.keys(data).length === 0) {
-                console.error(`❌ Empty data for ${table} (id: ${id})`);
-                return res.status(400).json({ error: "No data to update" });
+                console.error(`❌ ${table} için boş veri (id: ${id})`);
+                return res.status(400).json({ error: "Güncellenecek veri yok" });
             }
             
             const updates = Object.keys(data).map((key, index) => `${key} = $${index + 1}`).join(', ');
@@ -1363,39 +1234,39 @@ for (const table of tables) {
             const query = `UPDATE ${table} SET ${updates}, updated_at = CURRENT_TIMESTAMP WHERE id = $${values.length + 1} RETURNING *`;
             values.push(id);
             
-            console.log(`🔄 Updating: ${table}`);
-            console.log("🧾 Updates:", updates);
+            console.log(`🔄 Güncelleniyor: ${table}`);
+            console.log("🧾 Güncellemeler:", updates);
             console.log("🔍 SQL Query:", query);
             
             const result = await pool.query(query, values);
             if (result.rows.length === 0) {
-                console.error(`❌ Record not found: ${table} (id: ${id})`);
-                return res.status(404).json({ error: "Record not found" });
+                console.error(`❌ Kayıt bulunamadı: ${table} (id: ${id})`);
+                return res.status(404).json({ error: "Kayıt bulunamadı" });
             }
             
-            console.log(`✅ Update successful: ${table} (id: ${id})`);
-            // Consistent API response - always return a single object
+            console.log(`✅ Güncelleme başarılı: ${table} (id: ${id})`);
+            // Tutarlı API yanıtı - her zaman tek bir nesne döndür
             res.json(result.rows[0]);
         } catch (error) {
-            console.error(`❌ Error updating data in ${table} table:`, error);
+            console.error(`❌ ${table} tablosunda veri güncelleme hatası:`, error);
             
-            // More detailed error responses
+            // Daha detaylı hata yanıtları
             if (error.code === '23505') {
               return res.status(409).json({ 
-                error: 'Record already exists',
+                error: 'Aynı kayıt zaten var',
                 details: error.detail || error.message,
                 code: error.code
               });
             } else if (error.code === '22P02') {
               return res.status(400).json({ 
-                error: 'Invalid data type',
+                error: 'Geçersiz veri tipi',
                 details: error.message,
                 code: error.code
               });
             }
             
             res.status(500).json({ 
-                error: `Could not update data in ${table} table`,
+                error: `${table} tablosunda veri güncellenemedi`,
                 details: error.message,
                 code: error.code,
                 stack: error.stack
@@ -1404,115 +1275,115 @@ for (const table of tables) {
     });
 }
 
-// Delete all temporary calculations
+// Tüm Geçici Hesapları Silme
 app.delete('/api/panel_cost_cal_gecici_hesaplar/all', async (req, res) => {
   try {
     await pool.query('DELETE FROM panel_cost_cal_gecici_hesaplar');
-    res.json({ message: 'All temporary records deleted.' });
+    res.json({ message: 'Tüm geçici kayıtlar silindi.' });
   } catch (error) {
-    console.error("Error deleting all temporary calculations:", error);
+    console.error("Tüm geçici hesapları silme hatası:", error);
     res.status(500).json({ error: error.message });
   }
 });
 
-// Delete all cost list
+// Tüm Maliyet Listesini Silme
 app.delete('/api/panel_cost_cal_maliyet_listesi/all', async (req, res) => {
   try {
     await pool.query('DELETE FROM panel_cost_cal_maliyet_listesi');
-    res.json({ message: 'All cost records deleted.' });
+    res.json({ message: 'Tüm maliyet kayıtları silindi.' });
   } catch (error) {
-    console.error("Error deleting all cost list:", error);
+    console.error("Tüm maliyet listesini silme hatası:", error);
     res.status(500).json({ error: error.message });
   }
 });
 
-// Helper function to delete related records - with improved error handling
+// İlişkili Kayıtları Silme Yardımcı Fonksiyonu - İyileştirilmiş hata yönetimi
 async function deleteRelatedRecords(table, id) {
   try {
-    console.log(`🧹 Deleting related records for ${table} ID:${id}...`);
+    console.log(`🧹 ${table} tablosundan ID:${id} için ilişkili kayıtlar siliniyor...`);
     
-    // If MMGT is being deleted, delete related YMGT and recipes
+    // MM GT siliniyorsa, ilgili YM GT ve ilişkili reçeteleri sil
     if (table === 'gal_cost_cal_mm_gt') {
       try {
-        // Find related YMGT records
+        // İlişkili YM GT kayıtlarını bul
         const ymGtResult = await pool.query('SELECT id FROM gal_cost_cal_ym_gt WHERE mm_gt_id = $1', [id]);
-        console.log(`🔍 Found ${ymGtResult.rows.length} YMGT records`);
+        console.log(`🔍 Bulunan YM GT sayısı: ${ymGtResult.rows.length}`);
         
-        // Delete recipes for each YMGT
+        // Her bir YM GT için ilişkili reçeteleri sil
         for (const ymGt of ymGtResult.rows) {
           try {
             await pool.query('DELETE FROM gal_cost_cal_ym_gt_recete WHERE ym_gt_id = $1', [ymGt.id]);
-            console.log(`✅ YMGT recipe deleted: ${ymGt.id}`);
+            console.log(`✅ YM GT reçetesi silindi: ${ymGt.id}`);
           } catch (error) {
-            console.log(`⚠️ Error deleting YMGT recipe (${ymGt.id}):`, error.message);
+            console.log(`⚠️ YM GT reçetesi silinirken hata (${ymGt.id}):`, error.message);
           }
         }
         
-        // Delete YMGT records
+        // YM GT kayıtlarını sil
         try {
           const deletedYmGt = await pool.query('DELETE FROM gal_cost_cal_ym_gt WHERE mm_gt_id = $1', [id]);
-          console.log(`✅ YMGT records deleted: ${deletedYmGt.rowCount}`);
+          console.log(`✅ YM GT kayıtları silindi: ${deletedYmGt.rowCount}`);
         } catch (error) {
-          console.log(`⚠️ Error deleting YMGT records:`, error.message);
+          console.log(`⚠️ YM GT kayıtları silinirken hata:`, error.message);
         }
         
-        // Delete MMGT-YMST relationships
+        // MM GT-YM ST ilişkilerini sil
         try {
           const deletedRelations = await pool.query('DELETE FROM gal_cost_cal_mm_gt_ym_st WHERE mm_gt_id = $1', [id]);
-          console.log(`✅ MMGT-YMST relationships deleted: ${deletedRelations.rowCount}`);
+          console.log(`✅ MM GT-YM ST ilişkileri silindi: ${deletedRelations.rowCount}`);
         } catch (error) {
-          console.log(`⚠️ Error deleting MMGT-YMST relationships:`, error.message);
+          console.log(`⚠️ MM GT-YM ST ilişkileri silinirken hata:`, error.message);
         }
         
-        // Delete MMGT recipes
+        // MM GT reçetelerini sil
         try {
           const deletedRecipes = await pool.query('DELETE FROM gal_cost_cal_mm_gt_recete WHERE mm_gt_id = $1', [id]);
-          console.log(`✅ MMGT recipes deleted: ${deletedRecipes.rowCount}`);
+          console.log(`✅ MM GT reçeteleri silindi: ${deletedRecipes.rowCount}`);
         } catch (error) {
-          console.log(`⚠️ Error deleting MMGT recipes:`, error.message);
+          console.log(`⚠️ MM GT reçeteleri silinirken hata:`, error.message);
         }
       } catch (error) {
-        console.error(`❌ Error deleting related MMGT records:`, error);
+        console.error(`❌ MM GT ilişkili kayıtları silinirken hata:`, error);
       }
     }
     
-    // If YMGT is being deleted, delete related recipes
+    // YM GT siliniyorsa, ilişkili reçeteleri sil
     if (table === 'gal_cost_cal_ym_gt') {
       try {
         const deletedRecipes = await pool.query('DELETE FROM gal_cost_cal_ym_gt_recete WHERE ym_gt_id = $1', [id]);
-        console.log(`✅ YMGT recipes deleted: ${deletedRecipes.rowCount}`);
+        console.log(`✅ YM GT reçeteleri silindi: ${deletedRecipes.rowCount}`);
       } catch (error) {
-        console.log(`⚠️ Error deleting YMGT recipes:`, error.message);
+        console.log(`⚠️ YM GT reçeteleri silinirken hata:`, error.message);
       }
     }
     
-    // If YMST is being deleted, delete related MMGT-YMST relationships and recipes
+    // YM ST siliniyorsa, ilişkili MM GT-YM ST ilişkilerini ve reçeteleri sil
     if (table === 'gal_cost_cal_ym_st') {
       try {
         const deletedRelations = await pool.query('DELETE FROM gal_cost_cal_mm_gt_ym_st WHERE ym_st_id = $1', [id]);
-        console.log(`✅ MMGT-YMST relationships deleted: ${deletedRelations.rowCount}`);
+        console.log(`✅ MM GT-YM ST ilişkileri silindi: ${deletedRelations.rowCount}`);
       } catch (error) {
-        console.log(`⚠️ Error deleting MMGT-YMST relationships:`, error.message);
+        console.log(`⚠️ MM GT-YM ST ilişkileri silinirken hata:`, error.message);
       }
       
       try {
         const deletedRecipes = await pool.query('DELETE FROM gal_cost_cal_ym_st_recete WHERE ym_st_id = $1', [id]);
-        console.log(`✅ YMST recipes deleted: ${deletedRecipes.rowCount}`);
+        console.log(`✅ YM ST reçeteleri silindi: ${deletedRecipes.rowCount}`);
       } catch (error) {
-        console.log(`⚠️ Error deleting YMST recipes:`, error.message);
+        console.log(`⚠️ YM ST reçeteleri silinirken hata:`, error.message);
       }
     }
     
-    console.log(`✅ Related records for ${table} deleted successfully`);
+    console.log(`✅ ${table} için ilişkili kayıtlar başarıyla silindi`);
     return true;
   } catch (error) {
-    console.error(`❌ Error deleting related records (${table}, ${id}):`, error);
-    // Continue with main deletion even if related deletions fail
+    console.error(`❌ İlişkili kayıtları silme hatası (${table}, ${id}):`, error);
+    // Hata durumunda da devam et, ana silme işlemini engelleme
     return false;
   }
 }
 
-// General DELETE Route for Data Deletion (with cascading delete support)
+// Veri Silmek için Genel DELETE Rotası (kademeli silme destekli)
 for (const table of tables) {
     app.delete(`/api/${table}/:id`, async (req, res) => {
         const client = await pool.connect();
@@ -1521,27 +1392,27 @@ for (const table of tables) {
             await client.query('BEGIN');
             
             const { id } = req.params;
-            console.log(`🗑️ Deleting: ${table}, ID: ${id}`);
+            console.log(`🗑️ Siliniyor: ${table}, ID: ${id}`);
             
-            // Delete related records
+            // İlişkili kayıtları sil
             await deleteRelatedRecords(table, id);
             
-            // Delete main record
+            // Ana kaydı sil
             const query = `DELETE FROM ${table} WHERE id = $1 RETURNING *`;
             const result = await client.query(query, [id]);
             
             if (result.rows.length === 0) {
                 await client.query('ROLLBACK');
-                console.log(`❌ Record not found: ${table}, ID: ${id}`);
-                return res.status(404).json({ error: "Record not found" });
+                console.log(`❌ Kayıt bulunamadı: ${table}, ID: ${id}`);
+                return res.status(404).json({ error: "Kayıt bulunamadı" });
             }
             
             await client.query('COMMIT');
-            console.log(`✅ Successfully deleted: ${table}, ID: ${id}`);
-            res.json({ message: "Record successfully deleted", deletedRecord: result.rows[0] });
+            console.log(`✅ Başarıyla silindi: ${table}, ID: ${id}`);
+            res.json({ message: "Kayıt başarıyla silindi", deletedRecord: result.rows[0] });
         } catch (error) {
             await client.query('ROLLBACK');
-            console.error(`❌ Error deleting data from ${table} table:`, error);
+            console.error(`❌ ${table} tablosundan veri silme hatası:`, error);
             res.status(500).json({ error: error.message });
         } finally {
             client.release();
@@ -1549,25 +1420,132 @@ for (const table of tables) {
     });
 }
 
-// Get next sequence number
+// Veritabanı şeması hakkında bilgi almak için özel endpoint
+app.get('/api/debug/table/:table', async (req, res) => {
+  try {
+    const { table } = req.params;
+    
+    // Tablo adını doğrula (SQL injection önleme)
+    if (!tables.includes(table)) {
+      return res.status(400).json({ error: 'Geçersiz tablo adı' });
+    }
+    
+    // Tablo yapısını al
+    const query = `
+      SELECT 
+        column_name, 
+        data_type, 
+        is_nullable,
+        column_default
+      FROM 
+        information_schema.columns
+      WHERE 
+        table_name = $1
+      ORDER BY 
+        ordinal_position;
+    `;
+    
+    const result = await pool.query(query, [table]);
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Tablo bulunamadı' });
+    }
+    
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Tablo şeması alma hatası:', error);
+    res.status(500).json({ 
+      error: 'Tablo şeması alınamadı',
+      details: error.message
+    });
+  }
+});
+
+// Tüm timestamp alanlarını timestamptz'ye çeviren admin endpoint'i
+app.post('/api/admin/update-timestamp-columns', async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    
+    // Büyütülenecek tablolar (sadece belirtilen tablolar değil, veritabanındaki tüm tablolar)
+    const tablesResult = await client.query(`
+      SELECT table_name 
+      FROM information_schema.tables 
+      WHERE table_schema = 'public'
+      AND table_name LIKE 'panel_cost_cal_%'
+    `);
+    
+    const panelCitTables = tablesResult.rows.map(row => row.table_name);
+    const results = {};
+    
+    for (const table of panelCitTables) {
+      // Tablodaki timestamp sütunlarını kontrol et
+      const columnsResult = await client.query(`
+        SELECT column_name, data_type 
+        FROM information_schema.columns 
+        WHERE table_name = $1 
+        AND data_type = 'timestamp without time zone'
+      `, [table]);
+      
+      const timestampColumns = columnsResult.rows.map(row => row.column_name);
+      results[table] = {
+        columns_fixed: timestampColumns,
+        success: true
+      };
+      
+      // timestamp sütunlarını timestamptz'ye çevir
+      for (const column of timestampColumns) {
+        try {
+          await client.query(`
+            ALTER TABLE ${table} 
+            ALTER COLUMN ${column} TYPE TIMESTAMP WITH TIME ZONE
+          `);
+          console.log(`✅ ${table}.${column} başarıyla TIMESTAMP WITH TIME ZONE tipine güncellendi.`);
+        } catch (columnError) {
+          results[table].success = false;
+          results[table].error = columnError.message;
+          console.error(`❌ ${table}.${column} güncellenirken hata:`, columnError.message);
+        }
+      }
+    }
+    
+    await client.query('COMMIT');
+    res.json({
+      success: true,
+      message: 'Panel Cost Cal tablolarının timestamp alanları güncellendi',
+      details: results
+    });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Timestamp alanlarını güncelleme hatası:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  } finally {
+    client.release();
+  }
+});
+
+// Sıralı numara almak için endpoint
 app.get('/api/gal_cost_cal_sequence/next', async (req, res) => {
   try {
     const { kod_2, cap } = req.query;
     
     if (!kod_2 || !cap) {
-      return res.status(400).json({ error: 'kod_2 and cap parameters are required' });
+      return res.status(400).json({ error: 'kod_2 ve cap parametreleri gerekli' });
     }
     
-    // Convert comma decimal to dot format
+    // Virgüllü cap değerini noktalı formata dönüştür
     let normalizedCap = cap;
     if (typeof cap === 'string' && cap.includes(',')) {
       normalizedCap = cap.replace(/,/g, '.');
     }
     
-    // Format cap correctly
+    // Formatı kontrol et
     const formattedCap = parseFloat(normalizedCap).toFixed(2).replace('.', '').padStart(4, '0');
     
-    // Find highest sequence number for this combination
+    // Bu kombinasyon için en yüksek sıra numarasını bul
     const result = await pool.query(`
       SELECT MAX(CAST(SUBSTRING(stok_kodu FROM 10 FOR 2) AS INTEGER)) as max_seq
       FROM gal_cost_cal_mm_gt
@@ -1579,7 +1557,7 @@ app.get('/api/gal_cost_cal_sequence/next', async (req, res) => {
       nextSeq = result.rows[0].max_seq + 1;
     }
     
-    // Format as 2-digit sequence number
+    // 2 basamaklı sıra numarası formatı
     const formattedSeq = nextSeq.toString().padStart(2, '0');
     
     res.json({ 
@@ -1588,18 +1566,114 @@ app.get('/api/gal_cost_cal_sequence/next', async (req, res) => {
       stok_kodu: `GT.${kod_2}.${formattedCap}.${formattedSeq}`
     });
   } catch (error) {
-    console.error('Error getting sequence number:', error);
+    console.error('Sıra numarası alma hatası:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
-// Start server for local development
+// TLC Hizlar verilerini eklemek için yardımcı endpoint
+app.post('/api/bulk-import/tlc-hizlar', async (req, res) => {
+  const client = await pool.connect();
+  
+  try {
+    const data = req.body;
+    
+    if (!Array.isArray(data)) {
+      return res.status(400).json({ error: 'Geçersiz veri formatı. Veri dizi tipinde olmalıdır.' });
+    }
+    
+    if (data.length === 0) {
+      return res.status(400).json({ error: 'Boş veri listesi gönderilemez.' });
+    }
+    
+    console.log(`📥 TLC Hızlar verisi eklenecek: ${data.length} adet kayıt`);
+    
+    await client.query('BEGIN');
+    
+    // Önce tüm mevcut verileri temizleyelim (opsiyonel, güvenli bir silme istiyorsanız)
+    const clearResult = await client.query('DELETE FROM gal_cost_cal_user_tlc_hizlar');
+    console.log(`🧹 Mevcut TLC Hızlar tablosu temizlendi: ${clearResult.rowCount} kayıt silindi`);
+    
+    // Başarılı ve başarısız sayısını izleyen değişkenler
+    let successCount = 0;
+    let errorCount = 0;
+    let errors = [];
+    
+    // Her bir veriyi ekle
+    for (const item of data) {
+      try {
+        // Sayısal değerleri normalize et
+        const normalizedItem = normalizeData(item);
+        
+        // giris_capi, cikis_capi ve calisma_hizi zorunlu alanlar
+        if (!normalizedItem.giris_capi || !normalizedItem.cikis_capi || !normalizedItem.calisma_hizi) {
+          throw new Error('Zorunlu alanlar eksik: giris_capi, cikis_capi, calisma_hizi');
+        }
+        
+        // kod alanı için giris_capi x cikis_capi formatı oluştur
+        const kod = `${normalizedItem.giris_capi}x${normalizedItem.cikis_capi}`;
+        
+        const insertQuery = `
+          INSERT INTO gal_cost_cal_user_tlc_hizlar (
+            giris_capi, cikis_capi, kod, total_red, kafa_sayisi, 
+            calisma_hizi, uretim_kg_saat, elektrik_sarfiyat_kw_sa, elektrik_sarfiyat_kw_ton
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+          RETURNING id
+        `;
+        
+        const values = [
+          normalizedItem.giris_capi,
+          normalizedItem.cikis_capi,
+          kod,
+          normalizedItem.total_red || null,
+          normalizedItem.kafa_sayisi || null,
+          normalizedItem.calisma_hizi,
+          normalizedItem.uretim_kg_saat || null,
+          normalizedItem.elektrik_sarfiyat_kw_sa || null,
+          normalizedItem.elektrik_sarfiyat_kw_ton || null
+        ];
+        
+        const result = await client.query(insertQuery, values);
+        successCount++;
+      } catch (error) {
+        errorCount++;
+        errors.push({
+          item,
+          error: error.message
+        });
+        console.error(`❌ TLC Hızlar verisi eklenirken hata:`, error.message);
+      }
+    }
+    
+    await client.query('COMMIT');
+    
+    console.log(`✅ TLC Hızlar verisi eklendi: ${successCount} başarılı, ${errorCount} başarısız`);
+    
+    res.status(201).json({
+      success: true,
+      message: `TLC Hızlar verileri başarıyla içe aktarıldı.`,
+      details: {
+        success_count: successCount,
+        error_count: errorCount,
+        errors: errors.length > 0 ? errors : undefined
+      }
+    });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('❌ TLC Hızlar toplu veri ekleme hatası:', error);
+    res.status(500).json({ error: error.message });
+  } finally {
+    client.release();
+  }
+});
+
+// Yerel geliştirme için Sunucu Başlatma
 const PORT = process.env.PORT || 4000;
 if (process.env.NODE_ENV !== 'production') {
     app.listen(PORT, () => {
-        console.log(`🚀 Backend running on port ${PORT} with fixed CORS`);
+        console.log(`🚀 Backend ${PORT} portunda çalışıyor`);
     });
 }
 
-// Export for Vercel
+// Vercel için dışa aktar
 module.exports = app;

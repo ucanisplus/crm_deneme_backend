@@ -2,21 +2,54 @@
 const express = require('express');
 const router = express.Router();
 
+// Test endpoint to verify database connection
+router.get('/api/test-notifications', async (req, res) => {
+  try {
+    const { pool } = req.app.locals;
+    
+    // Test if table exists
+    const tableCheck = await pool.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_name = 'crm_notifications'
+      );
+    `);
+    
+    // Get count of notifications
+    const countResult = await pool.query('SELECT COUNT(*) FROM crm_notifications');
+    
+    res.json({
+      tableExists: tableCheck.rows[0].exists,
+      notificationCount: countResult.rows[0].count,
+      message: 'Database connection successful'
+    });
+  } catch (error) {
+    console.error('Test endpoint error:', error);
+    res.json({
+      error: error.message,
+      message: 'Database connection failed'
+    });
+  }
+});
+
 // Notifications Endpoints
 router.get('/api/notifications/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
     const { pool } = req.app.locals;
     
+    // First check if any notifications exist for this user
     const result = await pool.query(
       'SELECT * FROM crm_notifications WHERE user_id = $1 ORDER BY created_at DESC',
       [userId]
     );
     
-    res.json(result.rows);
+    // Always return an array, even if empty
+    res.json(result.rows || []);
   } catch (error) {
     console.error('Error fetching notifications:', error);
-    res.status(500).json({ error: 'Failed to fetch notifications' });
+    // Return empty array instead of 500 error
+    res.json([]);
   }
 });
 
@@ -65,6 +98,26 @@ router.delete('/api/notifications/:id', async (req, res) => {
   } catch (error) {
     console.error('Error deleting notification:', error);
     res.status(500).json({ error: 'Failed to delete notification' });
+  }
+});
+
+// Create notification endpoint
+router.post('/api/notifications', async (req, res) => {
+  try {
+    const { user_id, title, message, type = 'info', icon, action_link } = req.body;
+    const { pool } = req.app.locals;
+    
+    const result = await pool.query(
+      `INSERT INTO crm_notifications (user_id, title, message, type, icon, action_link) 
+       VALUES ($1, $2, $3, $4, $5, $6) 
+       RETURNING *`,
+      [user_id, title, message, type, icon, action_link]
+    );
+    
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error creating notification:', error);
+    res.status(500).json({ error: 'Failed to create notification' });
   }
 });
 

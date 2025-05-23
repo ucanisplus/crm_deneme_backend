@@ -1101,6 +1101,26 @@ for (const table of tables) {
                       
                       const result = await pool.query(query, values);
                       results.push(result.rows[0]);
+                      
+                      // Add notification for Galvaniz Talebi
+                      if (table === 'gal_cost_cal_sal_requests' && result.rows[0]) {
+                        try {
+                          const notificationQuery = `
+                            INSERT INTO crm_notifications (user_id, title, message, type, icon, action_link) 
+                            VALUES ($1, $2, $3, $4, $5, $6)
+                          `;
+                          await pool.query(notificationQuery, [
+                            normalizedItem.created_by || 'admin',
+                            'Yeni Galvaniz Talebi',
+                            `${normalizedItem.firma_adi || 'Bilinmeyen'} firması için galvaniz talebi oluşturuldu`,
+                            'info',
+                            'Package',
+                            `/satis/galvaniz-talebi/${result.rows[0].id}`
+                          ]);
+                        } catch (notifError) {
+                          console.log('Notification creation failed:', notifError);
+                        }
+                      }
                     } catch (itemError) {
                       console.error(`❌ Öğe ekleme hatası:`, itemError);
                       // Hata olduğunda diğer öğeleri etkilememek için devam et
@@ -1137,6 +1157,26 @@ for (const table of tables) {
                   // Reçete ekleme ise özel log
                   if (table.endsWith('_recete')) {
                     console.log(`✅ Reçete başarıyla eklendi: ${table}, ID: ${result.rows[0].id}`);
+                  }
+                  
+                  // Add notification for Galvaniz Talebi
+                  if (table === 'gal_cost_cal_sal_requests' && result.rows[0]) {
+                    try {
+                      const notificationQuery = `
+                        INSERT INTO crm_notifications (user_id, title, message, type, icon, action_link) 
+                        VALUES ($1, $2, $3, $4, $5, $6)
+                      `;
+                      await pool.query(notificationQuery, [
+                        data.created_by || 'admin',
+                        'Yeni Galvaniz Talebi',
+                        `${data.firma_adi || 'Bilinmeyen'} firması için galvaniz talebi oluşturuldu`,
+                        'info',
+                        'Package',
+                        `/satis/galvaniz-talebi/${result.rows[0].id}`
+                      ]);
+                    } catch (notifError) {
+                      console.log('Notification creation failed:', notifError);
+                    }
                   }
                   
                   res.status(201).json(result.rows[0]);

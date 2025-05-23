@@ -1667,6 +1667,11 @@ app.post('/api/bulk-import/tlc-hizlar', async (req, res) => {
   }
 });
 
+// Import new API endpoints
+const crmEndpoints = require('./api-endpoints');
+app.locals.pool = pool; // Make pool available to endpoints
+app.use(crmEndpoints);
+
 // Yerel geliştirme için Sunucu Başlatma
 const PORT = process.env.PORT || 4000;
 if (process.env.NODE_ENV !== 'production') {

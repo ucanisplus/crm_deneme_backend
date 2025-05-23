@@ -1109,8 +1109,11 @@ for (const table of tables) {
                             INSERT INTO crm_notifications (user_id, title, message, type, icon, action_link) 
                             VALUES ($1, $2, $3, $4, $5, $6)
                           `;
+                          // Get username from session or use created_by field
+                          const username = normalizedItem.created_by || normalizedItem.username || 'admin';
+                          
                           await pool.query(notificationQuery, [
-                            normalizedItem.created_by || 'admin',
+                            username,
                             'Yeni Galvaniz Talebi',
                             `${normalizedItem.firma_adi || 'Bilinmeyen'} firması için galvaniz talebi oluşturuldu`,
                             'info',
@@ -1166,8 +1169,11 @@ for (const table of tables) {
                         INSERT INTO crm_notifications (user_id, title, message, type, icon, action_link) 
                         VALUES ($1, $2, $3, $4, $5, $6)
                       `;
+                      // Get username from session or use created_by field
+                      const username = data.created_by || data.username || 'admin';
+                      
                       await pool.query(notificationQuery, [
-                        data.created_by || 'admin',
+                        username,
                         'Yeni Galvaniz Talebi',
                         `${data.firma_adi || 'Bilinmeyen'} firması için galvaniz talebi oluşturuldu`,
                         'info',

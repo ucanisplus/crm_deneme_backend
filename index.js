@@ -1738,10 +1738,9 @@ app.post('/api/send-galvaniz-notification', async (req, res) => {
         <!-- Header with Logo -->
         <div style="background: linear-gradient(135deg, #f5f5f5 0%, #e8e8e8 100%); padding: 40px 30px; text-align: center; border-bottom: 4px solid #dc3545;">
           <!-- Logo with multiple possible extensions -->
-          <img src="https://qanwthnnjyidnlaajnmg.supabase.co/storage/v1/object/public/profile-pictures/company-logo.png" 
+          <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQHRbZuBJGKNr0tNqoahRylJW_ybbltProcCw&s" 
                alt="ALBAYRAK DEMİR ÇELİK" 
-               style="max-height: 100px; margin-bottom: 20px; display: block; margin-left: auto; margin-right: auto;"
-               onerror="this.onerror=null; this.src='https://qanwthnnjyidnlaajnmg.supabase.co/storage/v1/object/public/profile-pictures/company-logo.jpg';">
+               style="max-height: 100px; margin-bottom: 20px; display: block; margin-left: auto; margin-right: auto;">
           <h1 style="color: #1a1a1a; margin: 0; font-size: 32px; font-weight: 300; letter-spacing: 1px;">ALBAYRAK DEMİR ÇELİK</h1>
           <p style="color: #666; margin: 8px 0 0 0; font-size: 14px; text-transform: uppercase; letter-spacing: 2px;">CRM SİSTEMİ</p>
         </div>

@@ -1732,71 +1732,108 @@ app.post('/api/send-galvaniz-notification', async (req, res) => {
     // Use direct HTTPS request to Resend API
     const https = require('https');
     
-    // Format the request data for email
+    // Format the request data for email with professional design
     const formattedData = `
-      <h2>Yeni Galvanizli Tel Talebi</h2>
-      <p><strong>Talep ID:</strong> ${requestId || 'N/A'}</p>
-      <p><strong>Talep Tarihi:</strong> ${new Date().toLocaleString('tr-TR')}</p>
-      
-      <h3>Talep Detayları:</h3>
-      <table style="border-collapse: collapse; width: 100%;">
-        <tr>
-          <td style="border: 1px solid #ddd; padding: 8px;"><strong>Çap:</strong></td>
-          <td style="border: 1px solid #ddd; padding: 8px;">${requestData?.cap || 'N/A'} mm</td>
-        </tr>
-        <tr>
-          <td style="border: 1px solid #ddd; padding: 8px;"><strong>Kod-2:</strong></td>
-          <td style="border: 1px solid #ddd; padding: 8px;">${requestData?.kod_2 || 'N/A'}</td>
-        </tr>
-        <tr>
-          <td style="border: 1px solid #ddd; padding: 8px;"><strong>Kaplama:</strong></td>
-          <td style="border: 1px solid #ddd; padding: 8px;">${requestData?.kaplama || 'N/A'} g/m²</td>
-        </tr>
-        <tr>
-          <td style="border: 1px solid #ddd; padding: 8px;"><strong>Min Mukavemet:</strong></td>
-          <td style="border: 1px solid #ddd; padding: 8px;">${requestData?.min_mukavemet || 'N/A'} MPa</td>
-        </tr>
-        <tr>
-          <td style="border: 1px solid #ddd; padding: 8px;"><strong>Max Mukavemet:</strong></td>
-          <td style="border: 1px solid #ddd; padding: 8px;">${requestData?.max_mukavemet || 'N/A'} MPa</td>
-        </tr>
-        <tr>
-          <td style="border: 1px solid #ddd; padding: 8px;"><strong>Miktar:</strong></td>
-          <td style="border: 1px solid #ddd; padding: 8px;">${requestData?.kg || 'N/A'} kg</td>
-        </tr>
-        <tr>
-          <td style="border: 1px solid #ddd; padding: 8px;"><strong>İç Çap:</strong></td>
-          <td style="border: 1px solid #ddd; padding: 8px;">${requestData?.ic_cap || 'N/A'} cm</td>
-        </tr>
-        <tr>
-          <td style="border: 1px solid #ddd; padding: 8px;"><strong>Dış Çap:</strong></td>
-          <td style="border: 1px solid #ddd; padding: 8px;">${requestData?.dis_cap || 'N/A'} cm</td>
-        </tr>
-        <tr>
-          <td style="border: 1px solid #ddd; padding: 8px;"><strong>Tolerans (+):</strong></td>
-          <td style="border: 1px solid #ddd; padding: 8px;">${requestData?.tolerans_plus || 'N/A'} mm</td>
-        </tr>
-        <tr>
-          <td style="border: 1px solid #ddd; padding: 8px;"><strong>Tolerans (-):</strong></td>
-          <td style="border: 1px solid #ddd; padding: 8px;">${requestData?.tolerans_minus || 'N/A'} mm</td>
-        </tr>
-        <tr>
-          <td style="border: 1px solid #ddd; padding: 8px;"><strong>Shrink:</strong></td>
-          <td style="border: 1px solid #ddd; padding: 8px;">${requestData?.shrink || 'N/A'}</td>
-        </tr>
-        <tr>
-          <td style="border: 1px solid #ddd; padding: 8px;"><strong>Unwinding:</strong></td>
-          <td style="border: 1px solid #ddd; padding: 8px;">${requestData?.unwinding || 'N/A'}</td>
-        </tr>
-      </table>
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <!-- Header with Logo -->
+        <div style="background-color: #f8f9fa; padding: 30px; text-align: center; border-bottom: 3px solid #dc3545;">
+          <!-- Logo - you'll need to upload it to Supabase and update this URL -->
+          <img src="https://qanwthnnjyidnlaajnmg.supabase.co/storage/v1/object/public/profile-pictures/company-logo.png" 
+               alt="ALBAYRAK DEMİR ÇELİK" 
+               style="max-height: 80px; margin-bottom: 15px;"
+               onerror="this.style.display='none'">
+          <h1 style="color: #333; margin: 10px 0 5px 0; font-size: 28px;">ALBAYRAK DEMİR ÇELİK</h1>
+          <p style="color: #666; margin: 0; font-size: 14px;">CRM Sistemi - Üretim Bildirimi</p>
+        </div>
+        
+        <!-- Main Content -->
+        <div style="padding: 30px; background-color: white;">
+          <div style="background-color: #dc3545; color: white; padding: 15px; border-radius: 5px; margin-bottom: 25px;">
+            <h2 style="margin: 0; font-size: 20px;">🏭 Yeni Galvanizli Tel Talebi</h2>
+          </div>
+          
+          <!-- Request Info -->
+          <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin-bottom: 25px;">
+            <table style="width: 100%; border-collapse: collapse;">
+              <tr>
+                <td style="padding: 5px 0;"><strong>📋 Talep ID:</strong></td>
+                <td style="padding: 5px 0; color: #dc3545; font-weight: bold;">${requestId || 'N/A'}</td>
+              </tr>
+              <tr>
+                <td style="padding: 5px 0;"><strong>📅 Talep Tarihi:</strong></td>
+                <td style="padding: 5px 0;">${new Date().toLocaleString('tr-TR')}</td>
+              </tr>
+            </table>
+          </div>
+          
+          <!-- Product Details -->
+          <h3 style="color: #333; border-bottom: 2px solid #dc3545; padding-bottom: 10px; margin-bottom: 20px;">
+            📊 Ürün Detayları
+          </h3>
+          
+          <table style="width: 100%; border-collapse: collapse; background-color: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            <tr style="background-color: #f8f9fa;">
+              <td style="border: 1px solid #dee2e6; padding: 12px; font-weight: bold; width: 40%;">Çap</td>
+              <td style="border: 1px solid #dee2e6; padding: 12px; color: #dc3545; font-weight: bold;">${requestData?.cap || 'N/A'} mm</td>
+            </tr>
+            <tr>
+              <td style="border: 1px solid #dee2e6; padding: 12px; font-weight: bold;">Kod-2</td>
+              <td style="border: 1px solid #dee2e6; padding: 12px;">${requestData?.kod_2 || 'N/A'}</td>
+            </tr>
+            <tr style="background-color: #f8f9fa;">
+              <td style="border: 1px solid #dee2e6; padding: 12px; font-weight: bold;">Kaplama</td>
+              <td style="border: 1px solid #dee2e6; padding: 12px;">${requestData?.kaplama || 'N/A'} g/m²</td>
+            </tr>
+            <tr>
+              <td style="border: 1px solid #dee2e6; padding: 12px; font-weight: bold;">Mukavemet Aralığı</td>
+              <td style="border: 1px solid #dee2e6; padding: 12px;">${requestData?.min_mukavemet || 'N/A'} - ${requestData?.max_mukavemet || 'N/A'} MPa</td>
+            </tr>
+            <tr style="background-color: #f8f9fa;">
+              <td style="border: 1px solid #dee2e6; padding: 12px; font-weight: bold;">Miktar</td>
+              <td style="border: 1px solid #dee2e6; padding: 12px; color: #dc3545; font-weight: bold;">${requestData?.kg || 'N/A'} kg</td>
+            </tr>
+            <tr>
+              <td style="border: 1px solid #dee2e6; padding: 12px; font-weight: bold;">Çap Ölçüleri</td>
+              <td style="border: 1px solid #dee2e6; padding: 12px;">İç: ${requestData?.ic_cap || 'N/A'} cm / Dış: ${requestData?.dis_cap || 'N/A'} cm</td>
+            </tr>
+            <tr style="background-color: #f8f9fa;">
+              <td style="border: 1px solid #dee2e6; padding: 12px; font-weight: bold;">Tolerans</td>
+              <td style="border: 1px solid #dee2e6; padding: 12px;">+${requestData?.tolerans_plus || 'N/A'} / -${requestData?.tolerans_minus || 'N/A'} mm</td>
+            </tr>
+            <tr>
+              <td style="border: 1px solid #dee2e6; padding: 12px; font-weight: bold;">Shrink</td>
+              <td style="border: 1px solid #dee2e6; padding: 12px;">${requestData?.shrink === 'evet' ? '✅ Evet' : '❌ Hayır'}</td>
+            </tr>
+            <tr style="background-color: #f8f9fa;">
+              <td style="border: 1px solid #dee2e6; padding: 12px; font-weight: bold;">Unwinding</td>
+              <td style="border: 1px solid #dee2e6; padding: 12px;">${requestData?.unwinding || 'N/A'}</td>
+            </tr>
+          </table>
+          
+          <!-- Action Button -->
+          <div style="text-align: center; margin-top: 30px;">
+            <p style="background-color: #28a745; color: white; padding: 15px; border-radius: 5px; display: inline-block;">
+              ✅ Bu talep üretim sürecine alınmalıdır
+            </p>
+          </div>
+        </div>
+      </div>
     `;
     
     // Prepare email data for Resend API
     const emailData = {
-      from: 'ALB CRM System <onboarding@resend.dev>', // Using Resend's test domain for now
-      to: ['albcrm01@gmail.com'], // Changed to your email for testing
+      from: 'ALB CRM System <onboarding@resend.dev>', // Using Resend's test domain
+      to: ['albcrm01@gmail.com'], // Your email
+      reply_to: 'hakannoob@gmail.com', // Production team can reply here
       subject: `Yeni Galvanizli Tel Talebi - ${requestId || new Date().getTime()}`,
-      html: formattedData
+      html: formattedData + `
+        <hr style="margin-top: 30px;">
+        <p style="color: #666; font-size: 12px;">
+          Bu email ALB CRM sistemi tarafından otomatik olarak gönderilmiştir.<br>
+          Üretim ekibi için: hakannoob@gmail.com<br>
+          <strong>Not:</strong> Domain doğrulaması yapılana kadar test modunda çalışmaktadır.
+        </p>
+      `
     };
     
     // Make direct API call to Resend

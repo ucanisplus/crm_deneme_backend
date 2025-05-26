@@ -1794,7 +1794,7 @@ app.post('/api/send-galvaniz-notification', async (req, res) => {
     // Prepare email data for Resend API
     const emailData = {
       from: 'ALB CRM System <onboarding@resend.dev>', // Using Resend's test domain for now
-      to: ['hakannoob@gmail.com'],
+      to: ['albcrm01@gmail.com'], // Changed to your email for testing
       subject: `Yeni Galvanizli Tel Talebi - ${requestId || new Date().getTime()}`,
       html: formattedData
     };

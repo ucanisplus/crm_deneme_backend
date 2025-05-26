@@ -1723,14 +1723,25 @@ app.post('/api/send-galvaniz-notification', async (req, res) => {
     const { requestData, requestId } = req.body;
     console.log('📧 Request data received:', { requestId, hasRequestData: !!requestData });
     
-    // Check if API key exists
-    if (!process.env.BREVO_API_KEY) {
-      console.error('❌ BREVO_API_KEY not found in environment variables');
-      throw new Error('Email API key not configured');
+    // Check if SMTP password exists
+    if (!process.env.BREVO_SMTP_KEY) {
+      console.error('❌ BREVO_SMTP_KEY not found in environment variables');
+      throw new Error('Email SMTP key not configured');
     }
     
-    // Use direct HTTP request instead of SDK due to module issues
-    const https = require('https');
+    // Use nodemailer for SMTP
+    const nodemailer = require('nodemailer');
+    
+    // Create transporter with Brevo SMTP settings
+    const transporter = nodemailer.createTransport({
+      host: 'smtp-relay.brevo.com',
+      port: 587,
+      secure: false, // true for 465, false for other ports
+      auth: {
+        user: '8d7c04001@smtp-brevo.com',
+        pass: process.env.BREVO_SMTP_KEY // Your SMTP key value from Brevo
+      }
+    });
     
     // Format the request data for email
     const formattedData = `
@@ -1755,58 +1766,17 @@ app.post('/api/send-galvaniz-notification', async (req, res) => {
       </ul>
     `;
     
-    // Prepare email data for Brevo API v3
-    const emailData = {
-      sender: { email: 'albcrm01@gmail.com', name: 'ALB CRM System' },
-      to: [{ email: 'hakannoob@gmail.com', name: 'Production Team' }],
+    // Email options
+    const mailOptions = {
+      from: '"ALB CRM System" <albcrm01@gmail.com>',
+      to: 'hakannoob@gmail.com',
       subject: `Yeni Galvanizli Tel Talebi - ${requestId || new Date().getTime()}`,
-      htmlContent: formattedData
+      html: formattedData
     };
     
-    // Make direct API call to Brevo
-    const options = {
-      hostname: 'api.brevo.com',
-      path: '/v3/smtp/email',
-      method: 'POST',
-      headers: {
-        'api-key': process.env.BREVO_API_KEY,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      }
-    };
-    
-    // Create promise for the API call
-    const sendEmail = new Promise((resolve, reject) => {
-      const request = https.request(options, (response) => {
-        let data = '';
-        
-        response.on('data', (chunk) => {
-          data += chunk;
-        });
-        
-        response.on('end', () => {
-          if (response.statusCode === 201) {
-            console.log('✅ Email başarıyla gönderildi');
-            resolve(JSON.parse(data));
-          } else {
-            console.error('❌ Brevo API error:', response.statusCode, data);
-            reject(new Error(`Brevo API error: ${response.statusCode} - ${data}`));
-          }
-        });
-      });
-      
-      request.on('error', (error) => {
-        console.error('❌ Request error:', error);
-        reject(error);
-      });
-      
-      // Send the request
-      request.write(JSON.stringify(emailData));
-      request.end();
-    });
-    
-    // Wait for email to be sent
-    await sendEmail;
+    // Send email
+    const info = await transporter.sendMail(mailOptions);
+    console.log('✅ Email başarıyla gönderildi:', info.messageId);
     
     res.status(200).json({ 
       success: true, 

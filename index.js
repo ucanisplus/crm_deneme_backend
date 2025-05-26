@@ -1723,11 +1723,25 @@ app.post('/api/send-galvaniz-notification', async (req, res) => {
     const { requestData, requestId } = req.body;
     console.log('📧 Request data received:', { requestId, hasRequestData: !!requestData });
     
+    // BREVO IMPLEMENTATION (Active)
+    // Check if Brevo API key exists
+    if (!process.env.BREVO_API_KEY) {
+      console.error('❌ BREVO_API_KEY not found in environment variables');
+      // Don't throw error to prevent breaking the flow
+      return res.status(200).json({ 
+        success: true, 
+        emailSent: false,
+        message: 'Email configuration missing'
+      });
+    }
+    
+    /* RESEND IMPLEMENTATION (Commented for future use)
     // Check if Resend API key exists
     if (!process.env.RESEND_API_KEY) {
       console.error('❌ RESEND_API_KEY not found in environment variables');
       throw new Error('Resend API key not configured');
     }
+    */
     
     // Use direct HTTPS request to Resend API
     const https = require('https');
@@ -1835,6 +1849,73 @@ app.post('/api/send-galvaniz-notification', async (req, res) => {
       </div>
     `;
     
+    // ===== BREVO IMPLEMENTATION (ACTIVE) =====
+    // Using Brevo API for email sending
+    const brevoEmailData = {
+      sender: {
+        name: 'ALB CRM System',
+        email: 'albcrm01@gmail.com' // Your verified sender
+      },
+      to: [
+        {
+          email: 'albcrm01@gmail.com', // For testing
+          name: 'ALB CRM Admin'
+        },
+        {
+          email: 'hakannoob@gmail.com', // Production team
+          name: 'Üretim Ekibi'
+        }
+      ],
+      subject: `Yeni Galvanizli Tel Talebi - ${requestId || new Date().getTime()}`,
+      htmlContent: formattedData
+    };
+    
+    // Make direct API call to Brevo
+    const brevoOptions = {
+      hostname: 'api.brevo.com',
+      path: '/v3/smtp/email',
+      method: 'POST',
+      headers: {
+        'api-key': process.env.BREVO_API_KEY,
+        'Content-Type': 'application/json',
+        'accept': 'application/json'
+      }
+    };
+    
+    // Create promise for the Brevo API call
+    const sendEmailBrevo = new Promise((resolve, reject) => {
+      const request = https.request(brevoOptions, (response) => {
+        let data = '';
+        
+        response.on('data', (chunk) => {
+          data += chunk;
+        });
+        
+        response.on('end', () => {
+          if (response.statusCode === 201) {
+            console.log('✅ Email başarıyla gönderildi via Brevo');
+            resolve(JSON.parse(data));
+          } else {
+            console.error('❌ Brevo API error:', response.statusCode, data);
+            reject(new Error(`Brevo API error: ${response.statusCode} - ${data}`));
+          }
+        });
+      });
+      
+      request.on('error', (error) => {
+        console.error('❌ Request error:', error);
+        reject(error);
+      });
+      
+      // Send the request
+      request.write(JSON.stringify(brevoEmailData));
+      request.end();
+    });
+    
+    // Wait for email to be sent
+    await sendEmailBrevo;
+    
+    /* ===== RESEND IMPLEMENTATION (COMMENTED FOR FUTURE USE) =====
     // Prepare email data for Resend API
     const emailData = {
       from: 'ALB CRM System <onboarding@resend.dev>', // Using Resend's test domain
@@ -1894,6 +1975,7 @@ app.post('/api/send-galvaniz-notification', async (req, res) => {
     
     // Wait for email to be sent
     await sendEmail;
+    */
     
     res.status(200).json({ 
       success: true, 

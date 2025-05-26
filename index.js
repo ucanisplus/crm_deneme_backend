@@ -1721,6 +1721,13 @@ app.post('/api/send-galvaniz-notification', async (req, res) => {
   // Always return success to prevent breaking the main flow
   try {
     const { requestData, requestId } = req.body;
+    console.log('📧 Request data received:', { requestId, hasRequestData: !!requestData });
+    
+    // Check if API key exists
+    if (!process.env.BREVO_API_KEY) {
+      console.error('❌ BREVO_API_KEY not found in environment variables');
+      throw new Error('Email API key not configured');
+    }
     
     // Initialize Brevo/SendinBlue
     const SibApiV3Sdk = require('sib-api-v3-sdk');
@@ -1729,6 +1736,7 @@ app.post('/api/send-galvaniz-notification', async (req, res) => {
     // Configure API key authorization
     const apiKey = defaultClient.authentications['api-key'];
     apiKey.apiKey = process.env.BREVO_API_KEY;
+    console.log('✅ Brevo API configured');
     
     // Create an instance of the API class
     const apiInstance = new SibApiV3Sdk.TransactionalEmailsApi();
@@ -1775,12 +1783,19 @@ app.post('/api/send-galvaniz-notification', async (req, res) => {
   } catch (error) {
     // Log error but don't break the main flow
     console.error('⚠️ Email gönderme hatası (ignored):', error.message);
+    console.error('Full error details:', error);
+    
+    // Check specific error types
+    if (error.response) {
+      console.error('Brevo API response error:', error.response.body);
+    }
     
     // Still return success to not break the request creation
     res.status(200).json({ 
       success: true, 
       emailSent: false,
-      message: 'Talep oluşturuldu ancak email gönderilemedi'
+      message: 'Talep oluşturuldu ancak email gönderilemedi',
+      error: error.message // Include error for debugging
     });
   }
 });

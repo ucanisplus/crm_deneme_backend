@@ -1723,25 +1723,14 @@ app.post('/api/send-galvaniz-notification', async (req, res) => {
     const { requestData, requestId } = req.body;
     console.log('📧 Request data received:', { requestId, hasRequestData: !!requestData });
     
-    // Check if SMTP password exists
-    if (!process.env.BREVO_SMTP_KEY) {
-      console.error('❌ BREVO_SMTP_KEY not found in environment variables');
-      throw new Error('Email SMTP key not configured');
+    // Check if Resend API key exists
+    if (!process.env.RESEND_API_KEY) {
+      console.error('❌ RESEND_API_KEY not found in environment variables');
+      throw new Error('Resend API key not configured');
     }
     
-    // Use nodemailer for SMTP
-    const nodemailer = require('nodemailer');
-    
-    // Create transporter with Brevo SMTP settings
-    const transporter = nodemailer.createTransport({
-      host: 'smtp-relay.brevo.com',
-      port: 587,
-      secure: false, // true for 465, false for other ports
-      auth: {
-        user: '8d7c04001@smtp-brevo.com',
-        pass: process.env.BREVO_SMTP_KEY // Your SMTP key value from Brevo
-      }
-    });
+    // Use direct HTTPS request to Resend API
+    const https = require('https');
     
     // Format the request data for email
     const formattedData = `
@@ -1750,33 +1739,109 @@ app.post('/api/send-galvaniz-notification', async (req, res) => {
       <p><strong>Talep Tarihi:</strong> ${new Date().toLocaleString('tr-TR')}</p>
       
       <h3>Talep Detayları:</h3>
-      <ul>
-        <li><strong>Çap:</strong> ${requestData?.cap || 'N/A'} mm</li>
-        <li><strong>Kod-2:</strong> ${requestData?.kod_2 || 'N/A'}</li>
-        <li><strong>Kaplama:</strong> ${requestData?.kaplama || 'N/A'} g/m²</li>
-        <li><strong>Min Mukavemet:</strong> ${requestData?.min_mukavemet || 'N/A'} MPa</li>
-        <li><strong>Max Mukavemet:</strong> ${requestData?.max_mukavemet || 'N/A'} MPa</li>
-        <li><strong>Miktar:</strong> ${requestData?.kg || 'N/A'} kg</li>
-        <li><strong>İç Çap:</strong> ${requestData?.ic_cap || 'N/A'} cm</li>
-        <li><strong>Dış Çap:</strong> ${requestData?.dis_cap || 'N/A'} cm</li>
-        <li><strong>Tolerans (+):</strong> ${requestData?.tolerans_plus || 'N/A'} mm</li>
-        <li><strong>Tolerans (-):</strong> ${requestData?.tolerans_minus || 'N/A'} mm</li>
-        <li><strong>Shrink:</strong> ${requestData?.shrink || 'N/A'}</li>
-        <li><strong>Unwinding:</strong> ${requestData?.unwinding || 'N/A'}</li>
-      </ul>
+      <table style="border-collapse: collapse; width: 100%;">
+        <tr>
+          <td style="border: 1px solid #ddd; padding: 8px;"><strong>Çap:</strong></td>
+          <td style="border: 1px solid #ddd; padding: 8px;">${requestData?.cap || 'N/A'} mm</td>
+        </tr>
+        <tr>
+          <td style="border: 1px solid #ddd; padding: 8px;"><strong>Kod-2:</strong></td>
+          <td style="border: 1px solid #ddd; padding: 8px;">${requestData?.kod_2 || 'N/A'}</td>
+        </tr>
+        <tr>
+          <td style="border: 1px solid #ddd; padding: 8px;"><strong>Kaplama:</strong></td>
+          <td style="border: 1px solid #ddd; padding: 8px;">${requestData?.kaplama || 'N/A'} g/m²</td>
+        </tr>
+        <tr>
+          <td style="border: 1px solid #ddd; padding: 8px;"><strong>Min Mukavemet:</strong></td>
+          <td style="border: 1px solid #ddd; padding: 8px;">${requestData?.min_mukavemet || 'N/A'} MPa</td>
+        </tr>
+        <tr>
+          <td style="border: 1px solid #ddd; padding: 8px;"><strong>Max Mukavemet:</strong></td>
+          <td style="border: 1px solid #ddd; padding: 8px;">${requestData?.max_mukavemet || 'N/A'} MPa</td>
+        </tr>
+        <tr>
+          <td style="border: 1px solid #ddd; padding: 8px;"><strong>Miktar:</strong></td>
+          <td style="border: 1px solid #ddd; padding: 8px;">${requestData?.kg || 'N/A'} kg</td>
+        </tr>
+        <tr>
+          <td style="border: 1px solid #ddd; padding: 8px;"><strong>İç Çap:</strong></td>
+          <td style="border: 1px solid #ddd; padding: 8px;">${requestData?.ic_cap || 'N/A'} cm</td>
+        </tr>
+        <tr>
+          <td style="border: 1px solid #ddd; padding: 8px;"><strong>Dış Çap:</strong></td>
+          <td style="border: 1px solid #ddd; padding: 8px;">${requestData?.dis_cap || 'N/A'} cm</td>
+        </tr>
+        <tr>
+          <td style="border: 1px solid #ddd; padding: 8px;"><strong>Tolerans (+):</strong></td>
+          <td style="border: 1px solid #ddd; padding: 8px;">${requestData?.tolerans_plus || 'N/A'} mm</td>
+        </tr>
+        <tr>
+          <td style="border: 1px solid #ddd; padding: 8px;"><strong>Tolerans (-):</strong></td>
+          <td style="border: 1px solid #ddd; padding: 8px;">${requestData?.tolerans_minus || 'N/A'} mm</td>
+        </tr>
+        <tr>
+          <td style="border: 1px solid #ddd; padding: 8px;"><strong>Shrink:</strong></td>
+          <td style="border: 1px solid #ddd; padding: 8px;">${requestData?.shrink || 'N/A'}</td>
+        </tr>
+        <tr>
+          <td style="border: 1px solid #ddd; padding: 8px;"><strong>Unwinding:</strong></td>
+          <td style="border: 1px solid #ddd; padding: 8px;">${requestData?.unwinding || 'N/A'}</td>
+        </tr>
+      </table>
     `;
     
-    // Email options
-    const mailOptions = {
-      from: '"ALB CRM System" <albcrm01@gmail.com>',
-      to: 'hakannoob@gmail.com',
+    // Prepare email data for Resend API
+    const emailData = {
+      from: 'ALB CRM System <onboarding@resend.dev>', // Using Resend's test domain for now
+      to: ['hakannoob@gmail.com'],
       subject: `Yeni Galvanizli Tel Talebi - ${requestId || new Date().getTime()}`,
       html: formattedData
     };
     
-    // Send email
-    const info = await transporter.sendMail(mailOptions);
-    console.log('✅ Email başarıyla gönderildi:', info.messageId);
+    // Make direct API call to Resend
+    const options = {
+      hostname: 'api.resend.com',
+      path: '/emails',
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
+        'Content-Type': 'application/json'
+      }
+    };
+    
+    // Create promise for the API call
+    const sendEmail = new Promise((resolve, reject) => {
+      const request = https.request(options, (response) => {
+        let data = '';
+        
+        response.on('data', (chunk) => {
+          data += chunk;
+        });
+        
+        response.on('end', () => {
+          if (response.statusCode === 200 || response.statusCode === 201) {
+            console.log('✅ Email başarıyla gönderildi via Resend');
+            resolve(JSON.parse(data));
+          } else {
+            console.error('❌ Resend API error:', response.statusCode, data);
+            reject(new Error(`Resend API error: ${response.statusCode} - ${data}`));
+          }
+        });
+      });
+      
+      request.on('error', (error) => {
+        console.error('❌ Request error:', error);
+        reject(error);
+      });
+      
+      // Send the request
+      request.write(JSON.stringify(emailData));
+      request.end();
+    });
+    
+    // Wait for email to be sent
+    await sendEmail;
     
     res.status(200).json({ 
       success: true, 

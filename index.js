@@ -1713,6 +1713,78 @@ app.post('/api/bulk-import/tlc-hizlar', async (req, res) => {
   }
 });
 
+// ISOLATED EMAIL ENDPOINT - Galvanizli Tel Request Notification
+// This endpoint is completely isolated to prevent any issues with the rest of the backend
+app.post('/api/send-galvaniz-notification', async (req, res) => {
+  console.log('📧 Galvaniz talep bildirimi gönderme isteği alındı');
+  
+  // Always return success to prevent breaking the main flow
+  try {
+    const { requestData, requestId } = req.body;
+    
+    // Initialize Brevo/SendinBlue
+    const SibApiV3Sdk = require('sib-api-v3-sdk');
+    const defaultClient = SibApiV3Sdk.ApiClient.instance;
+    
+    // Configure API key authorization
+    const apiKey = defaultClient.authentications['api-key'];
+    apiKey.apiKey = process.env.BREVO_API_KEY;
+    
+    // Create an instance of the API class
+    const apiInstance = new SibApiV3Sdk.TransactionalEmailsApi();
+    
+    // Format the request data for email
+    const formattedData = `
+      <h2>Yeni Galvanizli Tel Talebi</h2>
+      <p><strong>Talep ID:</strong> ${requestId || 'N/A'}</p>
+      <p><strong>Talep Tarihi:</strong> ${new Date().toLocaleString('tr-TR')}</p>
+      
+      <h3>Talep Detayları:</h3>
+      <ul>
+        <li><strong>Çap:</strong> ${requestData?.cap || 'N/A'} mm</li>
+        <li><strong>Kod-2:</strong> ${requestData?.kod_2 || 'N/A'}</li>
+        <li><strong>Kaplama:</strong> ${requestData?.kaplama || 'N/A'} g/m²</li>
+        <li><strong>Min Mukavemet:</strong> ${requestData?.min_mukavemet || 'N/A'} MPa</li>
+        <li><strong>Max Mukavemet:</strong> ${requestData?.max_mukavemet || 'N/A'} MPa</li>
+        <li><strong>Miktar:</strong> ${requestData?.kg || 'N/A'} kg</li>
+        <li><strong>İç Çap:</strong> ${requestData?.ic_cap || 'N/A'} cm</li>
+        <li><strong>Dış Çap:</strong> ${requestData?.dis_cap || 'N/A'} cm</li>
+        <li><strong>Tolerans (+):</strong> ${requestData?.tolerans_plus || 'N/A'} mm</li>
+        <li><strong>Tolerans (-):</strong> ${requestData?.tolerans_minus || 'N/A'} mm</li>
+        <li><strong>Shrink:</strong> ${requestData?.shrink || 'N/A'}</li>
+        <li><strong>Unwinding:</strong> ${requestData?.unwinding || 'N/A'}</li>
+      </ul>
+    `;
+    
+    const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
+    sendSmtpEmail.subject = `Yeni Galvanizli Tel Talebi - ${requestId || new Date().getTime()}`;
+    sendSmtpEmail.htmlContent = formattedData;
+    sendSmtpEmail.sender = { email: 'albcrm01@gmail.com', name: 'ALB CRM System' };
+    sendSmtpEmail.to = [{ email: 'hakannoob@gmail.com', name: 'Production Team' }];
+    
+    // Send email
+    const emailResult = await apiInstance.sendTransacEmail(sendSmtpEmail);
+    console.log('✅ Email başarıyla gönderildi:', emailResult);
+    
+    res.status(200).json({ 
+      success: true, 
+      emailSent: true,
+      message: 'Bildirim emaili gönderildi'
+    });
+    
+  } catch (error) {
+    // Log error but don't break the main flow
+    console.error('⚠️ Email gönderme hatası (ignored):', error.message);
+    
+    // Still return success to not break the request creation
+    res.status(200).json({ 
+      success: true, 
+      emailSent: false,
+      message: 'Talep oluşturuldu ancak email gönderilemedi'
+    });
+  }
+});
+
 // Import new API endpoints
 const crmEndpoints = require('./api-endpoints');
 app.locals.pool = pool; // Make pool available to endpoints

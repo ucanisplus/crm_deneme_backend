@@ -1729,17 +1729,8 @@ app.post('/api/send-galvaniz-notification', async (req, res) => {
       throw new Error('Email API key not configured');
     }
     
-    // Initialize Brevo/SendinBlue
-    const SibApiV3Sdk = require('sib-api-v3-sdk');
-    const defaultClient = SibApiV3Sdk.ApiClient.instance;
-    
-    // Configure API key authorization
-    const apiKey = defaultClient.authentications['api-key'];
-    apiKey.apiKey = process.env.BREVO_API_KEY;
-    console.log('✅ Brevo API configured');
-    
-    // Create an instance of the API class
-    const apiInstance = new SibApiV3Sdk.TransactionalEmailsApi();
+    // Use direct HTTP request instead of SDK due to module issues
+    const https = require('https');
     
     // Format the request data for email
     const formattedData = `
@@ -1764,15 +1755,58 @@ app.post('/api/send-galvaniz-notification', async (req, res) => {
       </ul>
     `;
     
-    const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
-    sendSmtpEmail.subject = `Yeni Galvanizli Tel Talebi - ${requestId || new Date().getTime()}`;
-    sendSmtpEmail.htmlContent = formattedData;
-    sendSmtpEmail.sender = { email: 'albcrm01@gmail.com', name: 'ALB CRM System' };
-    sendSmtpEmail.to = [{ email: 'hakannoob@gmail.com', name: 'Production Team' }];
+    // Prepare email data for Brevo API v3
+    const emailData = {
+      sender: { email: 'albcrm01@gmail.com', name: 'ALB CRM System' },
+      to: [{ email: 'hakannoob@gmail.com', name: 'Production Team' }],
+      subject: `Yeni Galvanizli Tel Talebi - ${requestId || new Date().getTime()}`,
+      htmlContent: formattedData
+    };
     
-    // Send email
-    const emailResult = await apiInstance.sendTransacEmail(sendSmtpEmail);
-    console.log('✅ Email başarıyla gönderildi:', emailResult);
+    // Make direct API call to Brevo
+    const options = {
+      hostname: 'api.brevo.com',
+      path: '/v3/smtp/email',
+      method: 'POST',
+      headers: {
+        'api-key': process.env.BREVO_API_KEY,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      }
+    };
+    
+    // Create promise for the API call
+    const sendEmail = new Promise((resolve, reject) => {
+      const request = https.request(options, (response) => {
+        let data = '';
+        
+        response.on('data', (chunk) => {
+          data += chunk;
+        });
+        
+        response.on('end', () => {
+          if (response.statusCode === 201) {
+            console.log('✅ Email başarıyla gönderildi');
+            resolve(JSON.parse(data));
+          } else {
+            console.error('❌ Brevo API error:', response.statusCode, data);
+            reject(new Error(`Brevo API error: ${response.statusCode} - ${data}`));
+          }
+        });
+      });
+      
+      request.on('error', (error) => {
+        console.error('❌ Request error:', error);
+        reject(error);
+      });
+      
+      // Send the request
+      request.write(JSON.stringify(emailData));
+      request.end();
+    });
+    
+    // Wait for email to be sent
+    await sendEmail;
     
     res.status(200).json({ 
       success: true, 
@@ -1783,12 +1817,6 @@ app.post('/api/send-galvaniz-notification', async (req, res) => {
   } catch (error) {
     // Log error but don't break the main flow
     console.error('⚠️ Email gönderme hatası (ignored):', error.message);
-    console.error('Full error details:', error);
-    
-    // Check specific error types
-    if (error.response) {
-      console.error('Brevo API response error:', error.response.body);
-    }
     
     // Still return success to not break the request creation
     res.status(200).json({ 

@@ -1734,88 +1734,104 @@ app.post('/api/send-galvaniz-notification', async (req, res) => {
     
     // Format the request data for email with professional design
     const formattedData = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 650px; margin: 0 auto; background-color: #ffffff;">
         <!-- Header with Logo -->
-        <div style="background-color: #f8f9fa; padding: 30px; text-align: center; border-bottom: 3px solid #dc3545;">
-          <!-- Logo - you'll need to upload it to Supabase and update this URL -->
+        <div style="background: linear-gradient(135deg, #f5f5f5 0%, #e8e8e8 100%); padding: 40px 30px; text-align: center; border-bottom: 4px solid #dc3545;">
+          <!-- Logo with multiple possible extensions -->
           <img src="https://qanwthnnjyidnlaajnmg.supabase.co/storage/v1/object/public/profile-pictures/company-logo.png" 
                alt="ALBAYRAK DEMİR ÇELİK" 
-               style="max-height: 80px; margin-bottom: 15px;"
-               onerror="this.style.display='none'">
-          <h1 style="color: #333; margin: 10px 0 5px 0; font-size: 28px;">ALBAYRAK DEMİR ÇELİK</h1>
-          <p style="color: #666; margin: 0; font-size: 14px;">CRM Sistemi - Üretim Bildirimi</p>
+               style="max-height: 100px; margin-bottom: 20px; display: block; margin-left: auto; margin-right: auto;"
+               onerror="this.onerror=null; this.src='https://qanwthnnjyidnlaajnmg.supabase.co/storage/v1/object/public/profile-pictures/company-logo.jpg';">
+          <h1 style="color: #1a1a1a; margin: 0; font-size: 32px; font-weight: 300; letter-spacing: 1px;">ALBAYRAK DEMİR ÇELİK</h1>
+          <p style="color: #666; margin: 8px 0 0 0; font-size: 14px; text-transform: uppercase; letter-spacing: 2px;">CRM SİSTEMİ</p>
         </div>
         
         <!-- Main Content -->
-        <div style="padding: 30px; background-color: white;">
-          <div style="background-color: #dc3545; color: white; padding: 15px; border-radius: 5px; margin-bottom: 25px;">
-            <h2 style="margin: 0; font-size: 20px;">🏭 Yeni Galvanizli Tel Talebi</h2>
+        <div style="padding: 40px 30px;">
+          <!-- Title Section -->
+          <div style="margin-bottom: 35px;">
+            <h2 style="color: #dc3545; font-size: 24px; font-weight: 400; margin: 0; padding-bottom: 15px; border-bottom: 1px solid #e0e0e0;">
+              Yeni Galvanizli Tel Talebi
+            </h2>
           </div>
           
           <!-- Request Info -->
-          <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin-bottom: 25px;">
+          <div style="background-color: #fafafa; padding: 20px; border-left: 4px solid #dc3545; margin-bottom: 30px;">
             <table style="width: 100%; border-collapse: collapse;">
               <tr>
-                <td style="padding: 5px 0;"><strong>📋 Talep ID:</strong></td>
-                <td style="padding: 5px 0; color: #dc3545; font-weight: bold;">${requestId || 'N/A'}</td>
+                <td style="padding: 8px 0; color: #666; font-size: 14px; width: 140px;">Talep Numarası:</td>
+                <td style="padding: 8px 0; color: #1a1a1a; font-weight: 600; font-size: 14px;">${requestId || 'N/A'}</td>
               </tr>
               <tr>
-                <td style="padding: 5px 0;"><strong>📅 Talep Tarihi:</strong></td>
-                <td style="padding: 5px 0;">${new Date().toLocaleString('tr-TR')}</td>
+                <td style="padding: 8px 0; color: #666; font-size: 14px;">Talep Tarihi:</td>
+                <td style="padding: 8px 0; color: #1a1a1a; font-size: 14px;">${new Date().toLocaleString('tr-TR')}</td>
               </tr>
             </table>
           </div>
           
           <!-- Product Details -->
-          <h3 style="color: #333; border-bottom: 2px solid #dc3545; padding-bottom: 10px; margin-bottom: 20px;">
-            📊 Ürün Detayları
-          </h3>
+          <div style="margin-bottom: 30px;">
+            <h3 style="color: #333; font-size: 18px; font-weight: 500; margin: 0 0 20px 0; padding-bottom: 10px; border-bottom: 1px solid #e0e0e0;">
+              Ürün Detayları
+            </h3>
+            
+            <table style="width: 100%; border-collapse: separate; border-spacing: 0; border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden;">
+              <tr>
+                <td style="background-color: #f8f9fa; border-bottom: 1px solid #e0e0e0; padding: 14px 20px; font-weight: 500; color: #333; width: 40%;">Çap</td>
+                <td style="background-color: #fff; border-bottom: 1px solid #e0e0e0; padding: 14px 20px; color: #dc3545; font-weight: 600;">${requestData?.cap || 'N/A'} mm</td>
+              </tr>
+              <tr>
+                <td style="background-color: #f8f9fa; border-bottom: 1px solid #e0e0e0; padding: 14px 20px; font-weight: 500; color: #333;">Kod-2</td>
+                <td style="background-color: #fff; border-bottom: 1px solid #e0e0e0; padding: 14px 20px; color: #1a1a1a;">${requestData?.kod_2 || 'N/A'}</td>
+              </tr>
+              <tr>
+                <td style="background-color: #f8f9fa; border-bottom: 1px solid #e0e0e0; padding: 14px 20px; font-weight: 500; color: #333;">Kaplama</td>
+                <td style="background-color: #fff; border-bottom: 1px solid #e0e0e0; padding: 14px 20px; color: #1a1a1a;">${requestData?.kaplama || 'N/A'} g/m²</td>
+              </tr>
+              <tr>
+                <td style="background-color: #f8f9fa; border-bottom: 1px solid #e0e0e0; padding: 14px 20px; font-weight: 500; color: #333;">Mukavemet Aralığı</td>
+                <td style="background-color: #fff; border-bottom: 1px solid #e0e0e0; padding: 14px 20px; color: #1a1a1a;">${requestData?.min_mukavemet || 'N/A'} - ${requestData?.max_mukavemet || 'N/A'} MPa</td>
+              </tr>
+              <tr>
+                <td style="background-color: #f8f9fa; border-bottom: 1px solid #e0e0e0; padding: 14px 20px; font-weight: 500; color: #333;">Miktar</td>
+                <td style="background-color: #fff; border-bottom: 1px solid #e0e0e0; padding: 14px 20px; color: #dc3545; font-weight: 600;">${requestData?.kg || 'N/A'} kg</td>
+              </tr>
+              <tr>
+                <td style="background-color: #f8f9fa; border-bottom: 1px solid #e0e0e0; padding: 14px 20px; font-weight: 500; color: #333;">Çap Ölçüleri</td>
+                <td style="background-color: #fff; border-bottom: 1px solid #e0e0e0; padding: 14px 20px; color: #1a1a1a;">İç: ${requestData?.ic_cap || 'N/A'} cm / Dış: ${requestData?.dis_cap || 'N/A'} cm</td>
+              </tr>
+              <tr>
+                <td style="background-color: #f8f9fa; border-bottom: 1px solid #e0e0e0; padding: 14px 20px; font-weight: 500; color: #333;">Tolerans</td>
+                <td style="background-color: #fff; border-bottom: 1px solid #e0e0e0; padding: 14px 20px; color: #1a1a1a;">+${requestData?.tolerans_plus || 'N/A'} / -${requestData?.tolerans_minus || 'N/A'} mm</td>
+              </tr>
+              <tr>
+                <td style="background-color: #f8f9fa; border-bottom: 1px solid #e0e0e0; padding: 14px 20px; font-weight: 500; color: #333;">Shrink</td>
+                <td style="background-color: #fff; border-bottom: 1px solid #e0e0e0; padding: 14px 20px; color: #1a1a1a;">${requestData?.shrink === 'evet' ? 'Evet' : 'Hayır'}</td>
+              </tr>
+              <tr>
+                <td style="background-color: #f8f9fa; padding: 14px 20px; font-weight: 500; color: #333;">Unwinding</td>
+                <td style="background-color: #fff; padding: 14px 20px; color: #1a1a1a;">${requestData?.unwinding || 'N/A'}</td>
+              </tr>
+            </table>
+          </div>
           
-          <table style="width: 100%; border-collapse: collapse; background-color: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-            <tr style="background-color: #f8f9fa;">
-              <td style="border: 1px solid #dee2e6; padding: 12px; font-weight: bold; width: 40%;">Çap</td>
-              <td style="border: 1px solid #dee2e6; padding: 12px; color: #dc3545; font-weight: bold;">${requestData?.cap || 'N/A'} mm</td>
-            </tr>
-            <tr>
-              <td style="border: 1px solid #dee2e6; padding: 12px; font-weight: bold;">Kod-2</td>
-              <td style="border: 1px solid #dee2e6; padding: 12px;">${requestData?.kod_2 || 'N/A'}</td>
-            </tr>
-            <tr style="background-color: #f8f9fa;">
-              <td style="border: 1px solid #dee2e6; padding: 12px; font-weight: bold;">Kaplama</td>
-              <td style="border: 1px solid #dee2e6; padding: 12px;">${requestData?.kaplama || 'N/A'} g/m²</td>
-            </tr>
-            <tr>
-              <td style="border: 1px solid #dee2e6; padding: 12px; font-weight: bold;">Mukavemet Aralığı</td>
-              <td style="border: 1px solid #dee2e6; padding: 12px;">${requestData?.min_mukavemet || 'N/A'} - ${requestData?.max_mukavemet || 'N/A'} MPa</td>
-            </tr>
-            <tr style="background-color: #f8f9fa;">
-              <td style="border: 1px solid #dee2e6; padding: 12px; font-weight: bold;">Miktar</td>
-              <td style="border: 1px solid #dee2e6; padding: 12px; color: #dc3545; font-weight: bold;">${requestData?.kg || 'N/A'} kg</td>
-            </tr>
-            <tr>
-              <td style="border: 1px solid #dee2e6; padding: 12px; font-weight: bold;">Çap Ölçüleri</td>
-              <td style="border: 1px solid #dee2e6; padding: 12px;">İç: ${requestData?.ic_cap || 'N/A'} cm / Dış: ${requestData?.dis_cap || 'N/A'} cm</td>
-            </tr>
-            <tr style="background-color: #f8f9fa;">
-              <td style="border: 1px solid #dee2e6; padding: 12px; font-weight: bold;">Tolerans</td>
-              <td style="border: 1px solid #dee2e6; padding: 12px;">+${requestData?.tolerans_plus || 'N/A'} / -${requestData?.tolerans_minus || 'N/A'} mm</td>
-            </tr>
-            <tr>
-              <td style="border: 1px solid #dee2e6; padding: 12px; font-weight: bold;">Shrink</td>
-              <td style="border: 1px solid #dee2e6; padding: 12px;">${requestData?.shrink === 'evet' ? '✅ Evet' : '❌ Hayır'}</td>
-            </tr>
-            <tr style="background-color: #f8f9fa;">
-              <td style="border: 1px solid #dee2e6; padding: 12px; font-weight: bold;">Unwinding</td>
-              <td style="border: 1px solid #dee2e6; padding: 12px;">${requestData?.unwinding || 'N/A'}</td>
-            </tr>
-          </table>
-          
-          <!-- Action Button -->
-          <div style="text-align: center; margin-top: 30px;">
-            <p style="background-color: #28a745; color: white; padding: 15px; border-radius: 5px; display: inline-block;">
-              ✅ Bu talep üretim sürecine alınmalıdır
+          <!-- Action Section -->
+          <div style="background-color: #f0f8ff; border: 1px solid #d1e7f5; padding: 25px; text-align: center; border-radius: 8px; margin-top: 35px;">
+            <p style="margin: 0; color: #0066cc; font-size: 16px; font-weight: 500;">
+              Bu talep üretim departmanına iletilmiştir
+            </p>
+            <p style="margin: 8px 0 0 0; color: #666; font-size: 14px;">
+              Lütfen en kısa sürede değerlendirme yapınız
             </p>
           </div>
+        </div>
+        
+        <!-- Footer -->
+        <div style="background-color: #f8f9fa; padding: 25px 30px; border-top: 1px solid #e0e0e0; text-align: center;">
+          <p style="margin: 0; color: #999; font-size: 12px; line-height: 1.6;">
+            Bu e-posta ALB CRM sistemi tarafından otomatik olarak gönderilmiştir.<br>
+            Lütfen bu e-postaya cevap vermeyiniz.
+          </p>
         </div>
       </div>
     `;

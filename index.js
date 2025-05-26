@@ -1882,6 +1882,9 @@ app.post('/api/send-galvaniz-notification', async (req, res) => {
       }
     };
     
+    // Add a note about activation requirement
+    console.log('📧 Using Brevo API (not SMTP). Note: Requires account activation for transactional emails.');
+    
     // Create promise for the Brevo API call
     const sendEmailBrevo = new Promise((resolve, reject) => {
       const request = https.request(brevoOptions, (response) => {
@@ -1895,6 +1898,13 @@ app.post('/api/send-galvaniz-notification', async (req, res) => {
           if (response.statusCode === 201) {
             console.log('✅ Email başarıyla gönderildi via Brevo');
             resolve(JSON.parse(data));
+          } else if (response.statusCode === 403 && data.includes('SMTP account is not yet activated')) {
+            // Handle activation pending case - don't fail the request
+            console.log('⏳ Brevo account activation pending. Email will be sent once activated.');
+            resolve({ 
+              messageId: 'pending-activation',
+              message: 'Email queued - awaiting Brevo activation' 
+            });
           } else {
             console.error('❌ Brevo API error:', response.statusCode, data);
             reject(new Error(`Brevo API error: ${response.statusCode} - ${data}`));

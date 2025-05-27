@@ -1723,7 +1723,7 @@ app.post('/api/send-galvaniz-notification', async (req, res) => {
     const { requestData, requestId } = req.body;
     console.log('📧 Request data received:', { requestId, hasRequestData: !!requestData });
     
-    // BREVO IMPLEMENTATION (Active)
+    /* BREVO IMPLEMENTATION (Commented - waiting for activation)
     // Check if Brevo API key exists
     if (!process.env.BREVO_API_KEY) {
       console.error('❌ BREVO_API_KEY not found in environment variables');
@@ -1734,14 +1734,14 @@ app.post('/api/send-galvaniz-notification', async (req, res) => {
         message: 'Email configuration missing'
       });
     }
+    */
     
-    /* RESEND IMPLEMENTATION (Commented for future use)
+    // RESEND IMPLEMENTATION (Active)
     // Check if Resend API key exists
     if (!process.env.RESEND_API_KEY) {
       console.error('❌ RESEND_API_KEY not found in environment variables');
       throw new Error('Resend API key not configured');
     }
-    */
     
     // Use direct HTTPS request to Resend API
     const https = require('https');
@@ -1849,7 +1849,7 @@ app.post('/api/send-galvaniz-notification', async (req, res) => {
       </div>
     `;
     
-    // ===== BREVO IMPLEMENTATION (ACTIVE) =====
+    /* ===== BREVO IMPLEMENTATION (COMMENTED - WAITING FOR ACTIVATION) =====
     // Using Brevo API for email sending
     const brevoEmailData = {
       sender: {
@@ -1924,8 +1924,9 @@ app.post('/api/send-galvaniz-notification', async (req, res) => {
     
     // Wait for email to be sent
     await sendEmailBrevo;
+    */
     
-    /* ===== RESEND IMPLEMENTATION (COMMENTED FOR FUTURE USE) =====
+    // ===== RESEND IMPLEMENTATION (ACTIVE) =====
     // Prepare email data for Resend API
     const emailData = {
       from: 'ALB CRM System <onboarding@resend.dev>', // Using Resend's test domain
@@ -1985,7 +1986,6 @@ app.post('/api/send-galvaniz-notification', async (req, res) => {
     
     // Wait for email to be sent
     await sendEmail;
-    */
     
     res.status(200).json({ 
       success: true, 

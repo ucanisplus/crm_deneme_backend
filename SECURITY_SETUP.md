@@ -5,7 +5,6 @@
 ### 1. Remove Exposed API Keys
 If your API keys have been exposed:
 1. **Immediately revoke/regenerate all API keys**:
-   - Brevo: Go to your Brevo dashboard > SMTP & API > API Keys
    - Resend: Go to resend.com/api-keys
    - Database: Change your database password
 

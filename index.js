@@ -1723,18 +1723,6 @@ app.post('/api/send-galvaniz-notification', async (req, res) => {
     const { requestData, requestId } = req.body;
     console.log('📧 Request data received:', { requestId, hasRequestData: !!requestData });
     
-    /* BREVO IMPLEMENTATION (Commented - waiting for activation)
-    // Check if Brevo API key exists
-    if (!process.env.BREVO_API_KEY) {
-      console.error('❌ BREVO_API_KEY not found in environment variables');
-      // Don't throw error to prevent breaking the flow
-      return res.status(200).json({ 
-        success: true, 
-        emailSent: false,
-        message: 'Email configuration missing'
-      });
-    }
-    */
     
     // RESEND IMPLEMENTATION (Active)
     // Check if Resend API key exists
@@ -1849,82 +1837,6 @@ app.post('/api/send-galvaniz-notification', async (req, res) => {
       </div>
     `;
     
-    /* ===== BREVO IMPLEMENTATION (COMMENTED - WAITING FOR ACTIVATION) =====
-    // Using Brevo API for email sending
-    const brevoEmailData = {
-      sender: {
-        name: 'ALB CRM System',
-        email: 'albcrm01@gmail.com' // Your verified sender
-      },
-      to: [
-        {
-          email: 'albcrm01@gmail.com', // For testing
-          name: 'ALB CRM Admin'
-        },
-        {
-          email: 'hakannoob@gmail.com', // Production team
-          name: 'Üretim Ekibi'
-        }
-      ],
-      subject: `Yeni Galvanizli Tel Talebi - ${requestId || new Date().getTime()}`,
-      htmlContent: formattedData
-    };
-    
-    // Make direct API call to Brevo
-    const brevoOptions = {
-      hostname: 'api.brevo.com',
-      path: '/v3/smtp/email',
-      method: 'POST',
-      headers: {
-        'api-key': process.env.BREVO_API_KEY,
-        'Content-Type': 'application/json',
-        'accept': 'application/json'
-      }
-    };
-    
-    // Add a note about activation requirement
-    console.log('📧 Using Brevo API (not SMTP). Note: Requires account activation for transactional emails.');
-    
-    // Create promise for the Brevo API call
-    const sendEmailBrevo = new Promise((resolve, reject) => {
-      const request = https.request(brevoOptions, (response) => {
-        let data = '';
-        
-        response.on('data', (chunk) => {
-          data += chunk;
-        });
-        
-        response.on('end', () => {
-          if (response.statusCode === 201) {
-            console.log('✅ Email başarıyla gönderildi via Brevo');
-            resolve(JSON.parse(data));
-          } else if (response.statusCode === 403 && data.includes('SMTP account is not yet activated')) {
-            // Handle activation pending case - don't fail the request
-            console.log('⏳ Brevo account activation pending. Email will be sent once activated.');
-            resolve({ 
-              messageId: 'pending-activation',
-              message: 'Email queued - awaiting Brevo activation' 
-            });
-          } else {
-            console.error('❌ Brevo API error:', response.statusCode, data);
-            reject(new Error(`Brevo API error: ${response.statusCode} - ${data}`));
-          }
-        });
-      });
-      
-      request.on('error', (error) => {
-        console.error('❌ Request error:', error);
-        reject(error);
-      });
-      
-      // Send the request
-      request.write(JSON.stringify(brevoEmailData));
-      request.end();
-    });
-    
-    // Wait for email to be sent
-    await sendEmailBrevo;
-    */
     
     // ===== RESEND IMPLEMENTATION (ACTIVE) =====
     // Prepare email data for Resend API

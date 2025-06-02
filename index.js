@@ -1351,26 +1351,42 @@ async function deleteRelatedRecords(table, id) {
     // MM GT siliniyorsa, ilgili YM GT ve ilişkili reçeteleri sil
     if (table === 'gal_cost_cal_mm_gt') {
       try {
-        // İlişkili YM GT kayıtlarını bul
-        const ymGtResult = await pool.query('SELECT id FROM gal_cost_cal_ym_gt WHERE mm_gt_id = $1', [id]);
-        console.log(`🔍 Bulunan YM GT sayısı: ${ymGtResult.rows.length}`);
-        
-        // Her bir YM GT için ilişkili reçeteleri sil
-        for (const ymGt of ymGtResult.rows) {
-          try {
-            await pool.query('DELETE FROM gal_cost_cal_ym_gt_recete WHERE ym_gt_id = $1', [ymGt.id]);
-            console.log(`✅ YM GT reçetesi silindi: ${ymGt.id}`);
-          } catch (error) {
-            console.log(`⚠️ YM GT reçetesi silinirken hata (${ymGt.id}):`, error.message);
-          }
+        // Önce MM GT'nin stok_kodu'nu al
+        const mmGtResult = await pool.query('SELECT stok_kodu FROM gal_cost_cal_mm_gt WHERE id = $1', [id]);
+        if (mmGtResult.rows.length === 0) {
+          console.log('⚠️ MM GT bulunamadı');
+          return;
         }
         
-        // YM GT kayıtlarını sil
-        try {
-          const deletedYmGt = await pool.query('DELETE FROM gal_cost_cal_ym_gt WHERE mm_gt_id = $1', [id]);
-          console.log(`✅ YM GT kayıtları silindi: ${deletedYmGt.rowCount}`);
-        } catch (error) {
-          console.log(`⚠️ YM GT kayıtları silinirken hata:`, error.message);
+        const mmGtStokKodu = mmGtResult.rows[0].stok_kodu;
+        console.log(`🔍 MM GT Stok Kodu: ${mmGtStokKodu}`);
+        
+        // Eşleşen YM GT'yi bul (aynı sequence'e sahip)
+        // MM GT: GT.X.0300.01 -> YM GT: YM.GT.X.0300.01
+        const ymGtStokKodu = mmGtStokKodu.replace('GT.', 'YM.GT.');
+        console.log(`🔍 Eşleşen YM GT Stok Kodu: ${ymGtStokKodu}`);
+        
+        const ymGtResult = await pool.query('SELECT id FROM gal_cost_cal_ym_gt WHERE stok_kodu = $1', [ymGtStokKodu]);
+        console.log(`🔍 Bulunan YM GT sayısı: ${ymGtResult.rows.length}`);
+        
+        // Eğer YM GT bulunduysa, onun reçetelerini sil
+        if (ymGtResult.rows.length > 0) {
+          const ymGtId = ymGtResult.rows[0].id;
+          
+          try {
+            const deletedYmGtRecipes = await pool.query('DELETE FROM gal_cost_cal_ym_gt_recete WHERE ym_gt_id = $1', [ymGtId]);
+            console.log(`✅ YM GT reçeteleri silindi: ${deletedYmGtRecipes.rowCount}`);
+          } catch (error) {
+            console.log(`⚠️ YM GT reçetesi silinirken hata:`, error.message);
+          }
+          
+          // YM GT kayıdını sil
+          try {
+            const deletedYmGt = await pool.query('DELETE FROM gal_cost_cal_ym_gt WHERE id = $1', [ymGtId]);
+            console.log(`✅ YM GT kaydı silindi: ${deletedYmGt.rowCount}`);
+          } catch (error) {
+            console.log(`⚠️ YM GT kaydı silinirken hata:`, error.message);
+          }
         }
         
         // MM GT-YM ST ilişkilerini sil

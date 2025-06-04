@@ -1620,7 +1620,7 @@ app.get('/api/gal_cost_cal_sequence/next', async (req, res) => {
       WHERE kod_2 = $1 AND stok_kodu LIKE $2
     `, [kod_2, `GT.${kod_2}.${formattedCap}.%`]);
     
-    let nextSeq = 1;
+    let nextSeq = 0;
     if (result.rows.length > 0 && result.rows[0].max_seq !== null) {
       nextSeq = result.rows[0].max_seq + 1;
     }

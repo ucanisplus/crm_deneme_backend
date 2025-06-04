@@ -807,7 +807,7 @@ for (const table of tables) {
     app.get(`/api/${table}`, async (req, res) => {
         try {
             // URL'den sorgu parametrelerini al
-            const { id, mm_gt_id, ym_gt_id, ym_st_id, kod_2, cap, stok_kodu, stok_kodu_like, ids, status, created_by } = req.query;
+            const { id, mm_gt_id, ym_gt_id, ym_st_id, kod_2, cap, stok_kodu, stok_kodu_like, ids, status, created_by, request_id } = req.query;
             
             let query = `SELECT * FROM ${table}`;
             const queryParams = [];
@@ -875,6 +875,12 @@ for (const table of tables) {
             if (created_by && table === 'gal_cost_cal_sal_requests') {
                 whereConditions.push(`created_by = $${queryParams.length + 1}`);
                 queryParams.push(created_by);
+            }
+            
+            // Request ID filtreleme - MM GT, YM GT, YM ST tabloları için
+            if (request_id && (table === 'gal_cost_cal_mm_gt' || table === 'gal_cost_cal_ym_gt' || table === 'gal_cost_cal_ym_st')) {
+                whereConditions.push(`request_id = $${queryParams.length + 1}`);
+                queryParams.push(request_id);
             }
             
             // WHERE koşullarını ekle

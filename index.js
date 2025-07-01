@@ -1887,6 +1887,12 @@ app.post('/api/send-galvaniz-notification', async (req, res) => {
             <p style="margin: 8px 0 0 0; color: #666; font-size: 14px;">
               Lütfen en kısa sürede değerlendirme yapınız
             </p>
+            <div style="margin-top: 20px;">
+              <a href="https://crm-deneme-1.vercel.app/" 
+                 style="display: inline-block; background-color: #dc3545; color: white; text-decoration: none; padding: 12px 30px; border-radius: 5px; font-weight: 500; font-size: 14px;">
+                CRM Sistemine Git
+              </a>
+            </div>
           </div>
         </div>
         

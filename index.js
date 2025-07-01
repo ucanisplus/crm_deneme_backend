@@ -1126,6 +1126,7 @@ for (const table of tables) {
                             'Package',
                             `/satis/galvaniz-talebi/${result.rows[0].id}`
                           ]);
+                          
                         } catch (notifError) {
                           console.log('Notification creation failed:', notifError);
                         }
@@ -1186,6 +1187,46 @@ for (const table of tables) {
                         'Package',
                         `/satis/galvaniz-talebi/${result.rows[0].id}`
                       ]);
+                      
+                      // Send email notification - wrapped in try-catch to not break the flow
+                      try {
+                        const https = require('https');
+                        const emailData = JSON.stringify({
+                          requestData: data,
+                          requestId: result.rows[0].id
+                        });
+                        
+                        const options = {
+                          hostname: 'crm-deneme-backend.vercel.app',
+                          path: '/api/send-galvaniz-notification',
+                          method: 'POST',
+                          headers: {
+                            'Content-Type': 'application/json',
+                            'Content-Length': emailData.length
+                          }
+                        };
+                        
+                        const emailReq = https.request(options, (res) => {
+                          let data = '';
+                          res.on('data', (chunk) => { data += chunk; });
+                          res.on('end', () => {
+                            if (res.statusCode === 200) {
+                              console.log('✅ Email notification sent for request:', result.rows[0].id);
+                            } else {
+                              console.warn('⚠️ Email notification failed for request:', result.rows[0].id);
+                            }
+                          });
+                        });
+                        
+                        emailReq.on('error', (error) => {
+                          console.error('⚠️ Email request error:', error.message);
+                        });
+                        
+                        emailReq.write(emailData);
+                        emailReq.end();
+                      } catch (emailError) {
+                        console.error('⚠️ Email sending error (ignored):', emailError.message);
+                      }
                     } catch (notifError) {
                       console.log('Notification creation failed:', notifError);
                     }

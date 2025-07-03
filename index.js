@@ -938,7 +938,7 @@ async function checkAndCreateTable(tableName) {
             alternatif_politika_uretim_s VARCHAR(50),
             alternatif_politika_mrp VARCHAR(50),
             ic_dis VARCHAR(10),
-            mm_id UUID
+            mm_id UUID REFERENCES celik_hasir_netsis_mm(id) ON DELETE CASCADE
           )
         `;
       } else if (tableName === 'celik_hasir_netsis_ncbk_recete') {
@@ -975,7 +975,7 @@ async function checkAndCreateTable(tableName) {
             alternatif_politika_uretim_s VARCHAR(50),
             alternatif_politika_mrp VARCHAR(50),
             ic_dis VARCHAR(10),
-            ncbk_id UUID
+            ncbk_id UUID REFERENCES celik_hasir_netsis_ym_ncbk(id) ON DELETE CASCADE
           )
         `;
       } else if (tableName === 'celik_hasir_netsis_ntel_recete') {
@@ -1012,7 +1012,7 @@ async function checkAndCreateTable(tableName) {
             alternatif_politika_uretim_s VARCHAR(50),
             alternatif_politika_mrp VARCHAR(50),
             ic_dis VARCHAR(10),
-            ntel_id UUID
+            ntel_id UUID REFERENCES celik_hasir_netsis_ym_ntel(id) ON DELETE CASCADE
           )
         `;
       } else if (tableName === 'celik_hasir_netsis_sequence') {

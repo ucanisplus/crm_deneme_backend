@@ -532,7 +532,16 @@ const tables = [
     'gal_cost_cal_sequence',
     'gal_cost_cal_sal_requests', // Talepler tablosu
     'gal_cost_cal_user_input_values', // Hesaplama değerleri için kullanıcı girdileri
-    'gal_cost_cal_user_tlc_hizlar' // TLC Hızlar tablosu için
+    'gal_cost_cal_user_tlc_hizlar', // TLC Hızlar tablosu için
+
+    // Çelik Hasır Netsis tabloları
+    'celik_hasir_netsis_mm',
+    'celik_hasir_netsis_ym_ncbk',
+    'celik_hasir_netsis_ym_ntel',
+    'celik_hasir_netsis_mm_recete',
+    'celik_hasir_netsis_ncbk_recete',
+    'celik_hasir_netsis_ntel_recete',
+    'celik_hasir_netsis_sequence'
 ];
 
 // Tablo varlığını kontrol et, yoksa oluştur
@@ -656,6 +665,368 @@ async function checkAndCreateTable(tableName) {
             ym_st_id UUID NOT NULL,
             sira INT,
             UNIQUE(mm_gt_id, ym_st_id)
+          )
+        `;
+      } else if (tableName === 'celik_hasir_netsis_mm') {
+        // Çelik Hasır MM (CH STOK) tablosu
+        createTableQuery = `
+          CREATE TABLE ${tableName} (
+            id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            user_id VARCHAR(255),
+            stok_kodu VARCHAR(255) UNIQUE,
+            stok_adi TEXT,
+            grup_kodu VARCHAR(50) DEFAULT 'MM',
+            kod_1 VARCHAR(50) DEFAULT 'HSR',
+            kod_2 VARCHAR(50),
+            ingilizce_isim TEXT,
+            alis_kdv_orani VARCHAR(10) DEFAULT '20',
+            satis_kdv_orani VARCHAR(10) DEFAULT '20',
+            muh_detay VARCHAR(50) DEFAULT '31',
+            depo_kodu VARCHAR(50) DEFAULT '36',
+            br_1 VARCHAR(10) DEFAULT 'KG',
+            br_2 VARCHAR(10) DEFAULT 'AD',
+            pay_1 INT DEFAULT 1,
+            payda_1 NUMERIC(10,3),
+            cevrim_degeri_1 NUMERIC(10,6),
+            olcu_br_3 VARCHAR(10),
+            cevrim_pay_2 INT DEFAULT 1,
+            cevrim_payda_2 INT DEFAULT 1,
+            cevrim_degeri_2 NUMERIC(10,4) DEFAULT 1,
+            hasir_tipi VARCHAR(20),
+            cap NUMERIC(10,4),
+            cap2 NUMERIC(10,4),
+            ebat_boy NUMERIC(10,2),
+            ebat_en NUMERIC(10,2),
+            goz_araligi VARCHAR(50),
+            kg NUMERIC(10,4),
+            ic_cap_boy_cubuk_ad INT,
+            dis_cap_en_cubuk_ad INT,
+            ozel_saha_2_say NUMERIC(10,4) DEFAULT 0,
+            ozel_saha_3_say NUMERIC(10,4) DEFAULT 0,
+            ozel_saha_4_say NUMERIC(10,4) DEFAULT 0,
+            ozel_saha_1_alf VARCHAR(255),
+            ozel_saha_2_alf VARCHAR(255),
+            ozel_saha_3_alf VARCHAR(255),
+            alis_fiyati NUMERIC(15,4) DEFAULT 0,
+            fiyat_birimi INT DEFAULT 2,
+            satis_fiyati_1 NUMERIC(15,4) DEFAULT 0,
+            satis_fiyati_2 NUMERIC(15,4) DEFAULT 0,
+            satis_fiyati_3 NUMERIC(15,4) DEFAULT 0,
+            satis_fiyati_4 NUMERIC(15,4) DEFAULT 0,
+            doviz_tip INT DEFAULT 0,
+            doviz_alis NUMERIC(15,4) DEFAULT 0,
+            doviz_maliyeti NUMERIC(15,4) DEFAULT 0,
+            doviz_satis_fiyati NUMERIC(15,4) DEFAULT 0,
+            azami_stok NUMERIC(15,4) DEFAULT 0,
+            asgari_stok NUMERIC(15,4) DEFAULT 0,
+            dov_tutar NUMERIC(15,4) DEFAULT 0,
+            dov_tipi VARCHAR(10),
+            alis_doviz_tipi INT DEFAULT 0,
+            bekleme_suresi INT DEFAULT 0,
+            temin_suresi INT DEFAULT 0,
+            birim_agirlik NUMERIC(10,6) DEFAULT 0,
+            nakliye_tutar NUMERIC(15,4) DEFAULT 0,
+            stok_turu VARCHAR(10) DEFAULT 'D',
+            mali_grup_kodu VARCHAR(50),
+            ozel_saha_8_alf VARCHAR(255),
+            kod_3 VARCHAR(50),
+            kod_4 VARCHAR(50),
+            kod_5 VARCHAR(50),
+            esnek_yapilandir VARCHAR(10) DEFAULT 'H',
+            super_recete_kullanilsin VARCHAR(10) DEFAULT 'H',
+            bagli_stok_kodu VARCHAR(255),
+            yapilandirma_kodu VARCHAR(255),
+            yap_aciklama TEXT,
+            girislerde_seri_numarasi_takibi VARCHAR(10) DEFAULT 'E',
+            cikislarda_seri_numarasi_takibi VARCHAR(10) DEFAULT 'E',
+            hasir_sayisi INT,
+            cubuk_sayisi_boy INT,
+            cubuk_sayisi_en INT,
+            adet_kg NUMERIC(10,4),
+            toplam_kg NUMERIC(10,4),
+            hasir_turu VARCHAR(100)
+          )
+        `;
+      } else if (tableName === 'celik_hasir_netsis_ym_ncbk') {
+        // Çelik Hasır YM NCBK tablosu
+        createTableQuery = `
+          CREATE TABLE ${tableName} (
+            id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            user_id VARCHAR(255),
+            stok_kodu VARCHAR(255) UNIQUE,
+            stok_adi TEXT,
+            grup_kodu VARCHAR(50) DEFAULT 'YM',
+            kod_1 VARCHAR(50) DEFAULT 'NCBK',
+            kod_2 VARCHAR(50),
+            ingilizce_isim TEXT,
+            alis_kdv_orani VARCHAR(10) DEFAULT '20',
+            satis_kdv_orani VARCHAR(10) DEFAULT '20',
+            muh_detay VARCHAR(50) DEFAULT '35',
+            depo_kodu VARCHAR(50) DEFAULT '35',
+            br_1 VARCHAR(10) DEFAULT 'AD',
+            br_2 VARCHAR(10) DEFAULT 'KG',
+            pay_1 NUMERIC(10,4),
+            payda_1 NUMERIC(10,3) DEFAULT 1,
+            cevrim_degeri_1 NUMERIC(10,6),
+            olcu_br_3 VARCHAR(10),
+            cevrim_pay_2 INT DEFAULT 1,
+            cevrim_payda_2 INT DEFAULT 1,
+            cevrim_degeri_2 NUMERIC(10,4) DEFAULT 1,
+            hasir_tipi VARCHAR(20),
+            cap NUMERIC(10,4),
+            cap2 NUMERIC(10,4),
+            ebat_boy NUMERIC(10,2),
+            ebat_en NUMERIC(10,2),
+            goz_araligi VARCHAR(50),
+            kg NUMERIC(10,4),
+            ic_cap_boy_cubuk_ad INT,
+            dis_cap_en_cubuk_ad INT,
+            ozel_saha_2_say NUMERIC(10,4) DEFAULT 0,
+            ozel_saha_3_say NUMERIC(10,4) DEFAULT 0,
+            ozel_saha_4_say NUMERIC(10,4) DEFAULT 0,
+            ozel_saha_1_alf VARCHAR(255),
+            ozel_saha_2_alf VARCHAR(255),
+            ozel_saha_3_alf VARCHAR(255),
+            alis_fiyati NUMERIC(15,4) DEFAULT 0,
+            fiyat_birimi INT DEFAULT 2,
+            satis_fiyati_1 NUMERIC(15,4) DEFAULT 0,
+            satis_fiyati_2 NUMERIC(15,4) DEFAULT 0,
+            satis_fiyati_3 NUMERIC(15,4) DEFAULT 0,
+            satis_fiyati_4 NUMERIC(15,4) DEFAULT 0,
+            doviz_tip INT DEFAULT 0,
+            doviz_alis NUMERIC(15,4) DEFAULT 0,
+            doviz_maliyeti NUMERIC(15,4) DEFAULT 0,
+            doviz_satis_fiyati NUMERIC(15,4) DEFAULT 0,
+            azami_stok NUMERIC(15,4) DEFAULT 0,
+            asgari_stok NUMERIC(15,4) DEFAULT 0,
+            dov_tutar NUMERIC(15,4) DEFAULT 0,
+            dov_tipi VARCHAR(10),
+            alis_doviz_tipi INT DEFAULT 0,
+            bekleme_suresi INT DEFAULT 0,
+            temin_suresi INT DEFAULT 0,
+            birim_agirlik NUMERIC(10,6) DEFAULT 0,
+            nakliye_tutar NUMERIC(15,4) DEFAULT 0,
+            stok_turu VARCHAR(10) DEFAULT 'D',
+            mali_grup_kodu VARCHAR(50),
+            ozel_saha_8_alf VARCHAR(255),
+            kod_3 VARCHAR(50),
+            kod_4 VARCHAR(50),
+            kod_5 VARCHAR(50),
+            esnek_yapilandir VARCHAR(10) DEFAULT 'H',
+            super_recete_kullanilsin VARCHAR(10) DEFAULT 'H',
+            bagli_stok_kodu VARCHAR(255),
+            yapilandirma_kodu VARCHAR(255),
+            yap_aciklama TEXT,
+            girislerde_seri_numarasi_takibi VARCHAR(10) DEFAULT 'E',
+            cikislarda_seri_numarasi_takibi VARCHAR(10) DEFAULT 'E',
+            length_cm INT,
+            parent_ch_id UUID
+          )
+        `;
+      } else if (tableName === 'celik_hasir_netsis_ym_ntel') {
+        // Çelik Hasır YM NTEL tablosu
+        createTableQuery = `
+          CREATE TABLE ${tableName} (
+            id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            user_id VARCHAR(255),
+            stok_kodu VARCHAR(255) UNIQUE,
+            stok_adi TEXT,
+            grup_kodu VARCHAR(50) DEFAULT 'YM',
+            kod_1 VARCHAR(50) DEFAULT 'NTEL',
+            kod_2 VARCHAR(50),
+            ingilizce_isim TEXT,
+            alis_kdv_orani VARCHAR(10) DEFAULT '20',
+            satis_kdv_orani VARCHAR(10) DEFAULT '20',
+            muh_detay VARCHAR(50) DEFAULT '35',
+            depo_kodu VARCHAR(50) DEFAULT '35',
+            br_1 VARCHAR(10) DEFAULT 'MT',
+            br_2 VARCHAR(10) DEFAULT 'KG',
+            pay_1 NUMERIC(10,4),
+            payda_1 NUMERIC(10,3) DEFAULT 1,
+            cevrim_degeri_1 NUMERIC(10,6),
+            olcu_br_3 VARCHAR(10),
+            cevrim_pay_2 INT DEFAULT 1,
+            cevrim_payda_2 INT DEFAULT 1,
+            cevrim_degeri_2 NUMERIC(10,4) DEFAULT 1,
+            hasir_tipi VARCHAR(20),
+            cap NUMERIC(10,4),
+            cap2 NUMERIC(10,4),
+            ebat_boy NUMERIC(10,2),
+            ebat_en NUMERIC(10,2),
+            goz_araligi VARCHAR(50),
+            kg NUMERIC(10,4),
+            ic_cap_boy_cubuk_ad INT,
+            dis_cap_en_cubuk_ad INT,
+            ozel_saha_2_say NUMERIC(10,4) DEFAULT 0,
+            ozel_saha_3_say NUMERIC(10,4) DEFAULT 0,
+            ozel_saha_4_say NUMERIC(10,4) DEFAULT 0,
+            ozel_saha_1_alf VARCHAR(255),
+            ozel_saha_2_alf VARCHAR(255),
+            ozel_saha_3_alf VARCHAR(255),
+            alis_fiyati NUMERIC(15,4) DEFAULT 0,
+            fiyat_birimi INT DEFAULT 2,
+            satis_fiyati_1 NUMERIC(15,4) DEFAULT 0,
+            satis_fiyati_2 NUMERIC(15,4) DEFAULT 0,
+            satis_fiyati_3 NUMERIC(15,4) DEFAULT 0,
+            satis_fiyati_4 NUMERIC(15,4) DEFAULT 0,
+            doviz_tip INT DEFAULT 0,
+            doviz_alis NUMERIC(15,4) DEFAULT 0,
+            doviz_maliyeti NUMERIC(15,4) DEFAULT 0,
+            doviz_satis_fiyati NUMERIC(15,4) DEFAULT 0,
+            azami_stok NUMERIC(15,4) DEFAULT 0,
+            asgari_stok NUMERIC(15,4) DEFAULT 0,
+            dov_tutar NUMERIC(15,4) DEFAULT 0,
+            dov_tipi VARCHAR(10),
+            alis_doviz_tipi INT DEFAULT 0,
+            bekleme_suresi INT DEFAULT 0,
+            temin_suresi INT DEFAULT 0,
+            birim_agirlik NUMERIC(10,6) DEFAULT 0,
+            nakliye_tutar NUMERIC(15,4) DEFAULT 0,
+            stok_turu VARCHAR(10) DEFAULT 'D',
+            mali_grup_kodu VARCHAR(50),
+            ozel_saha_8_alf VARCHAR(255),
+            kod_3 VARCHAR(50),
+            kod_4 VARCHAR(50),
+            kod_5 VARCHAR(50),
+            esnek_yapilandir VARCHAR(10) DEFAULT 'H',
+            super_recete_kullanilsin VARCHAR(10) DEFAULT 'H',
+            bagli_stok_kodu VARCHAR(255),
+            yapilandirma_kodu VARCHAR(255),
+            yap_aciklama TEXT,
+            girislerde_seri_numarasi_takibi VARCHAR(10) DEFAULT 'E',
+            cikislarda_seri_numarasi_takibi VARCHAR(10) DEFAULT 'E',
+            parent_ch_id UUID
+          )
+        `;
+      } else if (tableName === 'celik_hasir_netsis_mm_recete') {
+        // Çelik Hasır MM Reçete tablosu
+        createTableQuery = `
+          CREATE TABLE ${tableName} (
+            id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            mamul_kodu VARCHAR(255),
+            recete_top NUMERIC(10,4) DEFAULT 1,
+            fire_orani NUMERIC(10,6) DEFAULT 0,
+            oto_rec VARCHAR(10),
+            olcu_br VARCHAR(10),
+            sira_no INT,
+            operasyon_bilesen VARCHAR(50),
+            bilesen_kodu VARCHAR(255),
+            olcu_br_bilesen VARCHAR(10),
+            miktar NUMERIC(15,6),
+            aciklama TEXT,
+            miktar_sabitle VARCHAR(10),
+            stok_maliyet VARCHAR(10),
+            fire_mik NUMERIC(15,6),
+            sabit_fire_mik NUMERIC(15,6),
+            istasyon_kodu VARCHAR(50),
+            hazirlik_suresi NUMERIC(15,6),
+            uretim_suresi NUMERIC(15,6),
+            ua_dahil_edilsin VARCHAR(10),
+            son_operasyon VARCHAR(10),
+            oncelik INT,
+            planlama_orani NUMERIC(10,4),
+            alternatif_politika_da_transfer VARCHAR(50),
+            alternatif_politika_ambar_c VARCHAR(50),
+            alternatif_politika_uretim_s VARCHAR(50),
+            alternatif_politika_mrp VARCHAR(50),
+            ic_dis VARCHAR(10),
+            mm_id UUID
+          )
+        `;
+      } else if (tableName === 'celik_hasir_netsis_ncbk_recete') {
+        // Çelik Hasır NCBK Reçete tablosu
+        createTableQuery = `
+          CREATE TABLE ${tableName} (
+            id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            mamul_kodu VARCHAR(255),
+            recete_top NUMERIC(10,4) DEFAULT 1,
+            fire_orani NUMERIC(10,6) DEFAULT 0,
+            oto_rec VARCHAR(10),
+            olcu_br VARCHAR(10),
+            sira_no INT,
+            operasyon_bilesen VARCHAR(50),
+            bilesen_kodu VARCHAR(255),
+            olcu_br_bilesen VARCHAR(10),
+            miktar NUMERIC(15,6),
+            aciklama TEXT,
+            miktar_sabitle VARCHAR(10),
+            stok_maliyet VARCHAR(10),
+            fire_mik NUMERIC(15,6),
+            sabit_fire_mik NUMERIC(15,6),
+            istasyon_kodu VARCHAR(50),
+            hazirlik_suresi NUMERIC(15,6),
+            uretim_suresi NUMERIC(15,6),
+            ua_dahil_edilsin VARCHAR(10),
+            son_operasyon VARCHAR(10),
+            oncelik INT,
+            planlama_orani NUMERIC(10,4),
+            alternatif_politika_da_transfer VARCHAR(50),
+            alternatif_politika_ambar_c VARCHAR(50),
+            alternatif_politika_uretim_s VARCHAR(50),
+            alternatif_politika_mrp VARCHAR(50),
+            ic_dis VARCHAR(10),
+            ncbk_id UUID
+          )
+        `;
+      } else if (tableName === 'celik_hasir_netsis_ntel_recete') {
+        // Çelik Hasır NTEL Reçete tablosu
+        createTableQuery = `
+          CREATE TABLE ${tableName} (
+            id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            mamul_kodu VARCHAR(255),
+            recete_top NUMERIC(10,4) DEFAULT 1,
+            fire_orani NUMERIC(10,6) DEFAULT 0,
+            oto_rec VARCHAR(10),
+            olcu_br VARCHAR(10),
+            sira_no INT,
+            operasyon_bilesen VARCHAR(50),
+            bilesen_kodu VARCHAR(255),
+            olcu_br_bilesen VARCHAR(10),
+            miktar NUMERIC(15,6),
+            aciklama TEXT,
+            miktar_sabitle VARCHAR(10),
+            stok_maliyet VARCHAR(10),
+            fire_mik NUMERIC(15,6),
+            sabit_fire_mik NUMERIC(15,6),
+            istasyon_kodu VARCHAR(50),
+            hazirlik_suresi NUMERIC(15,6),
+            uretim_suresi NUMERIC(15,6),
+            ua_dahil_edilsin VARCHAR(10),
+            son_operasyon VARCHAR(10),
+            oncelik INT,
+            planlama_orani NUMERIC(10,4),
+            alternatif_politika_da_transfer VARCHAR(50),
+            alternatif_politika_ambar_c VARCHAR(50),
+            alternatif_politika_uretim_s VARCHAR(50),
+            alternatif_politika_mrp VARCHAR(50),
+            ic_dis VARCHAR(10),
+            ntel_id UUID
+          )
+        `;
+      } else if (tableName === 'celik_hasir_netsis_sequence') {
+        // Çelik Hasır Sequence tablosu
+        createTableQuery = `
+          CREATE TABLE ${tableName} (
+            id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            product_type VARCHAR(10),
+            kod_2 VARCHAR(50),
+            cap_code VARCHAR(10),
+            last_sequence INT DEFAULT 0,
+            UNIQUE(product_type, kod_2, cap_code)
           )
         `;
       } else {
@@ -1480,6 +1851,36 @@ async function deleteRelatedRecords(table, id) {
         console.log(`✅ YM ST reçeteleri silindi: ${deletedRecipes.rowCount}`);
       } catch (error) {
         console.log(`⚠️ YM ST reçeteleri silinirken hata:`, error.message);
+      }
+    }
+    
+    // Çelik Hasır MM siliniyorsa, ilişkili reçeteleri sil
+    if (table === 'celik_hasir_netsis_mm') {
+      try {
+        const deletedRecipes = await pool.query('DELETE FROM celik_hasir_netsis_mm_recete WHERE mm_id = $1', [id]);
+        console.log(`✅ Çelik Hasır MM reçeteleri silindi: ${deletedRecipes.rowCount}`);
+      } catch (error) {
+        console.log(`⚠️ Çelik Hasır MM reçeteleri silinirken hata:`, error.message);
+      }
+    }
+    
+    // Çelik Hasır NCBK siliniyorsa, ilişkili reçeteleri sil
+    if (table === 'celik_hasir_netsis_ym_ncbk') {
+      try {
+        const deletedRecipes = await pool.query('DELETE FROM celik_hasir_netsis_ncbk_recete WHERE ncbk_id = $1', [id]);
+        console.log(`✅ Çelik Hasır NCBK reçeteleri silindi: ${deletedRecipes.rowCount}`);
+      } catch (error) {
+        console.log(`⚠️ Çelik Hasır NCBK reçeteleri silinirken hata:`, error.message);
+      }
+    }
+    
+    // Çelik Hasır NTEL siliniyorsa, ilişkili reçeteleri sil
+    if (table === 'celik_hasir_netsis_ym_ntel') {
+      try {
+        const deletedRecipes = await pool.query('DELETE FROM celik_hasir_netsis_ntel_recete WHERE ntel_id = $1', [id]);
+        console.log(`✅ Çelik Hasır NTEL reçeteleri silindi: ${deletedRecipes.rowCount}`);
+      } catch (error) {
+        console.log(`⚠️ Çelik Hasır NTEL reçeteleri silinirken hata:`, error.message);
       }
     }
     

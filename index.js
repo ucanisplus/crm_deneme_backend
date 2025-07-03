@@ -1857,7 +1857,7 @@ app.post('/api/send-galvaniz-notification', async (req, res) => {
                 <td style="background-color: #fff; border-bottom: 1px solid #e0e0e0; padding: 14px 20px; color: #1a1a1a;">${requestData?.min_mukavemet || 'N/A'} - ${requestData?.max_mukavemet || 'N/A'} MPa</td>
               </tr>
               <tr>
-                <td style="background-color: #f8f9fa; border-bottom: 1px solid #e0e0e0; padding: 14px 20px; font-weight: 500; color: #333;">Miktar</td>
+                <td style="background-color: #f8f9fa; border-bottom: 1px solid #e0e0e0; padding: 14px 20px; font-weight: 500; color: #333;">Ağırlık</td>
                 <td style="background-color: #fff; border-bottom: 1px solid #e0e0e0; padding: 14px 20px; color: #dc3545; font-weight: 600;">${requestData?.kg || 'N/A'} kg</td>
               </tr>
               <tr>

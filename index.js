@@ -2052,8 +2052,8 @@ app.get('/api/gal_cost_cal_sequence/next', async (req, res) => {
       normalizedCap = cap.replace(/,/g, '.');
     }
     
-    // Formatı kontrol et
-    const formattedCap = parseFloat(normalizedCap).toFixed(2).replace('.', '').padStart(4, '0');
+    // Formatı kontrol et - 5 decimal places
+    const formattedCap = parseFloat(normalizedCap).toFixed(5).replace('.', '').padStart(7, '0');
     
     // Bu kombinasyon için en yüksek sıra numarasını bul
     const result = await pool.query(`

@@ -1,5 +1,6 @@
 // RENDER-SPECIFIC DEPLOYMENT WITH APS/OR-TOOLS
 // This file should ONLY be deployed on Render, not Vercel
+// Render should use this file as the main entry point
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');

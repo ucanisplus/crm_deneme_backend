@@ -1,0 +1,24 @@
+# Render Deployment Configuration
+services:
+  - type: web
+    name: crm-factory-backend
+    env: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /
+    
+    # Environment variables
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false  # You'll set this in Render dashboard
+      - key: PORT
+        value: 3000
+    
+    # Auto-deploy settings
+    autoDeploy: true
+    
+    # Custom domains (if you want to add later)
+    # domains:
+    #   - your-custom-domain.com

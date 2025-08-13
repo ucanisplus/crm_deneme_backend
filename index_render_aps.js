@@ -29,6 +29,16 @@ app.get('/', (req, res) => {
   });
 });
 
+// Alternative health check endpoint
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'healthy',
+    service: 'APS Backend',
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString()
+  });
+});
+
 // APS Calculate Production Time endpoint
 app.post('/api/aps/calculate-time', async (req, res) => {
   try {

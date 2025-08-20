@@ -325,4 +325,141 @@ router.delete('/api/favorites/:id', async (req, res) => {
   }
 });
 
+// Mesh Type Configuration Endpoints
+router.get('/api/mesh-configs', async (req, res) => {
+  try {
+    const { pool } = req.app.locals;
+    
+    const result = await pool.query(
+      'SELECT * FROM mesh_type_configs ORDER BY type, hasir_tipi'
+    );
+    
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching mesh configurations:', error);
+    res.status(500).json({ error: 'Failed to fetch mesh configurations' });
+  }
+});
+
+router.get('/api/mesh-configs/:hasirTipi', async (req, res) => {
+  try {
+    const { hasirTipi } = req.params;
+    const { pool } = req.app.locals;
+    
+    const result = await pool.query(
+      'SELECT * FROM mesh_type_configs WHERE hasir_tipi = $1',
+      [hasirTipi]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Mesh configuration not found' });
+    }
+    
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error fetching mesh configuration:', error);
+    res.status(500).json({ error: 'Failed to fetch mesh configuration' });
+  }
+});
+
+router.post('/api/mesh-configs', async (req, res) => {
+  try {
+    const { hasirTipi, boyCap, enCap, boyAralik, enAralik, type, description } = req.body;
+    const { pool } = req.app.locals;
+    
+    // Validate required fields
+    if (!hasirTipi || !boyCap || !enCap || !boyAralik || !enAralik || !type) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+    
+    const result = await pool.query(
+      `INSERT INTO mesh_type_configs (hasir_tipi, boy_cap, en_cap, boy_aralik, en_aralik, type, description) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7) 
+       RETURNING *`,
+      [hasirTipi, boyCap, enCap, boyAralik, enAralik, type, description]
+    );
+    
+    res.status(201).json({ 
+      message: 'Mesh configuration created successfully',
+      data: result.rows[0] 
+    });
+  } catch (error) {
+    console.error('Error creating mesh configuration:', error);
+    if (error.code === '23505') { // Unique constraint violation
+      res.status(409).json({ error: 'Mesh type already exists' });
+    } else {
+      res.status(500).json({ error: 'Failed to create mesh configuration' });
+    }
+  }
+});
+
+router.put('/api/mesh-configs/:hasirTipi', async (req, res) => {
+  try {
+    const { hasirTipi } = req.params;
+    const { boyCap, enCap, boyAralik, enAralik, type, description } = req.body;
+    const { pool } = req.app.locals;
+    
+    const result = await pool.query(
+      `UPDATE mesh_type_configs 
+       SET boy_cap = $2, en_cap = $3, boy_aralik = $4, en_aralik = $5, type = $6, description = $7
+       WHERE hasir_tipi = $1 
+       RETURNING *`,
+      [hasirTipi, boyCap, enCap, boyAralik, enAralik, type, description]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Mesh configuration not found' });
+    }
+    
+    res.json({
+      message: 'Mesh configuration updated successfully',
+      data: result.rows[0]
+    });
+  } catch (error) {
+    console.error('Error updating mesh configuration:', error);
+    res.status(500).json({ error: 'Failed to update mesh configuration' });
+  }
+});
+
+router.delete('/api/mesh-configs/:hasirTipi', async (req, res) => {
+  try {
+    const { hasirTipi } = req.params;
+    const { pool } = req.app.locals;
+    
+    const result = await pool.query(
+      'DELETE FROM mesh_type_configs WHERE hasir_tipi = $1 RETURNING *',
+      [hasirTipi]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Mesh configuration not found' });
+    }
+    
+    res.json({ 
+      message: 'Mesh configuration deleted successfully',
+      data: result.rows[0]
+    });
+  } catch (error) {
+    console.error('Error deleting mesh configuration:', error);
+    res.status(500).json({ error: 'Failed to delete mesh configuration' });
+  }
+});
+
+router.get('/api/mesh-configs/type/:type', async (req, res) => {
+  try {
+    const { type } = req.params;
+    const { pool } = req.app.locals;
+    
+    const result = await pool.query(
+      'SELECT * FROM mesh_type_configs WHERE type = $1 ORDER BY hasir_tipi',
+      [type.toUpperCase()]
+    );
+    
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching mesh configurations by type:', error);
+    res.status(500).json({ error: 'Failed to fetch mesh configurations by type' });
+  }
+});
+
 module.exports = router;

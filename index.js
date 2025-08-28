@@ -147,8 +147,19 @@ const normalizeData = (data) => {
     const normalizedData = {};
     
     for (const [key, value] of Object.entries(data)) {
+      // Skip normalization for text fields that should remain as strings
+      const textFields = ['stok_adi', 'stok_kodu', 'ingilizce_isim', 'hasir_tipi', 'grup_kodu', 
+                          'kod_1', 'kod_2', 'br_1', 'br_2', 'olcu_br_3', 'hasir_turu', 
+                          'stok_turu', 'esnek_yapilandir', 'super_recete_kullanilsin',
+                          'bilesen_kodu', 'olcu_br_bilesen', 'aciklama', 'operasyon_bilesen',
+                          'goz_araligi', 'mamul_kodu'];
+      
+      if (textFields.includes(key)) {
+        // Keep text fields as-is, just handle empty strings
+        normalizedData[key] = (typeof value === 'string' && value.trim() === '') ? null : value;
+      }
       // Boş string kontrolü
-      if (typeof value === 'string' && value.trim() === '') {
+      else if (typeof value === 'string' && value.trim() === '') {
         normalizedData[key] = null;
       }
       // Değer bir nesne veya dizi ise içeriğini de işle

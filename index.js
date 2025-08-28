@@ -6,11 +6,26 @@ const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 
 const app = express();
+// Enhanced CORS configuration for Vercel deployment
 app.use(cors({
-  origin: '*',  // Geliştirme için - üretime geçerken bu kısıtlanmalıdır
+  origin: '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+  credentials: false
 }));
+
+// Explicit CORS middleware for all requests
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept');
+  
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(200);
+  } else {
+    next();
+  }
+});
 
 // CORS Preflight kontrolü için OPTIONS yanıtı
 app.options('*', cors());

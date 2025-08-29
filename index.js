@@ -87,10 +87,16 @@ app.use((req, res, next) => {
   next();
 });
 
-// PostgreSQL Bağlantısı
+// PostgreSQL Bağlantısı - OPTIMIZED CONFIGURATION
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: false }
+    ssl: { rejectUnauthorized: false },
+    // Performance optimizations
+    max: 20, // Increase max connections from default 10
+    idleTimeoutMillis: 30000, // 30 seconds
+    connectionTimeoutMillis: 10000, // 10 seconds
+    statement_timeout: 60000, // 60 seconds for queries
+    query_timeout: 60000 // 60 seconds
 });
 
 // Database error handling
@@ -1290,18 +1296,62 @@ for (const table of tables) {
                 query += ` ORDER BY created_at DESC`;
             }
             
+            // Add ordering for better performance on large datasets
+            if (table.includes('celik_hasir')) {
+                query += ' ORDER BY id';
+            }
+            
             console.log(`🔍 ${table} için sorgu:`, query);
             console.log("📝 Parametreler:", queryParams);
             
-            const result = await pool.query(query, queryParams);
+            // Get a client from the pool for better connection management
+            const client = await pool.connect();
             
-            // API tutarlılığı: Her zaman dizi döndür, boş sonuç için boş dizi
-            res.json(result.rows);
+            try {
+                // Set statement timeout for this specific query
+                await client.query('SET statement_timeout = 60000'); // 60 seconds
+                
+                // Check if we need to count total rows (for large datasets)
+                const countQuery = query.replace('SELECT *', 'SELECT COUNT(*) as total');
+                const countResult = await client.query(countQuery, queryParams);
+                const totalRows = parseInt(countResult.rows[0].total);
+                
+                console.log(`📊 ${table} total rows: ${totalRows}`);
+                
+                // Execute the main query
+                const result = await client.query(query, queryParams);
+                
+                // Add total count to response headers for frontend
+                res.setHeader('X-Total-Count', totalRows);
+                res.setHeader('Cache-Control', 'no-cache'); // Prevent caching issues
+                
+                // API tutarlılığı: Her zaman dizi döndür, boş sonuç için boş dizi
+                res.json(result.rows);
+            } finally {
+                // Always release the client back to the pool
+                client.release();
+            }
         } catch (error) {
             console.error(`${table} tablosundan veri getirme hatası:`, error);
             
-            // Reçete tabloları için 404 hatası durumunda boş bir dizi döndür
-            if (table.endsWith('_recete')) {
+            // Better error handling for different error types
+            if (error.code === '57014') {
+                // Query timeout
+                return res.status(504).json({ 
+                    error: 'Query timeout - dataset too large',
+                    suggestion: 'Try using filters to reduce the dataset size',
+                    code: error.code
+                });
+            } else if (error.code === '53300') {
+                // Too many connections
+                return res.status(503).json({ 
+                    error: 'Database connection limit reached',
+                    suggestion: 'Please try again in a moment',
+                    retry: true,
+                    code: error.code
+                });
+            } else if (table.endsWith('_recete')) {
+                // Reçete tabloları için 404 hatası durumunda boş bir dizi döndür
                 console.log(`⚠️ ${table} tablosundan veri bulunamadı - boş dizi döndürülüyor`);
                 return res.json([]);
             }
@@ -2421,6 +2471,98 @@ app.locals.pool = pool; // Make pool available to endpoints
 app.use(crmEndpoints);
 
 // Yerel geliştirme için Sunucu Başlatma
+// Add dedicated export endpoint for large datasets
+app.get('/api/export/:table', async (req, res) => {
+    const { table } = req.params;
+    const client = await pool.connect();
+    
+    try {
+        // Set longer timeout for export operations
+        await client.query('SET statement_timeout = 120000'); // 2 minutes
+        
+        // Build query with filters if provided
+        let query = `SELECT * FROM ${table}`;
+        const queryParams = [];
+        const whereConditions = [];
+        
+        // Add any filters from query parameters
+        const { ids, hasir_tipi, stok_kodu_like } = req.query;
+        
+        if (ids) {
+            const idList = ids.split(',');
+            whereConditions.push(`id IN (${idList.map((_, i) => `$${queryParams.length + 1 + i}`).join(', ')})`);
+            idList.forEach(id => queryParams.push(id));
+        }
+        
+        if (hasir_tipi) {
+            whereConditions.push(`hasir_tipi = $${queryParams.length + 1}`);
+            queryParams.push(hasir_tipi);
+        }
+        
+        if (stok_kodu_like) {
+            whereConditions.push(`stok_kodu LIKE $${queryParams.length + 1}`);
+            queryParams.push(`${stok_kodu_like}%`);
+        }
+        
+        if (whereConditions.length > 0) {
+            query += ` WHERE ${whereConditions.join(' AND ')}`;
+        }
+        
+        query += ' ORDER BY id';
+        
+        console.log(`📤 Export query for ${table}:`, query);
+        
+        const result = await client.query(query, queryParams);
+        
+        // Return data optimized for Excel export
+        res.setHeader('Content-Type', 'application/json');
+        res.setHeader('X-Total-Count', result.rows.length);
+        res.json({
+            data: result.rows,
+            count: result.rows.length,
+            table: table
+        });
+        
+    } catch (error) {
+        console.error(`Export error for ${table}:`, error);
+        
+        if (error.code === '57014') {
+            res.status(504).json({ 
+                error: 'Export timeout - dataset too large',
+                suggestion: 'Try exporting with filters to reduce size'
+            });
+        } else {
+            res.status(500).json({ 
+                error: 'Export failed',
+                details: error.message
+            });
+        }
+    } finally {
+        client.release();
+    }
+});
+
+// Add health check endpoint for monitoring
+app.get('/api/health', async (req, res) => {
+    try {
+        const result = await pool.query('SELECT NOW()');
+        res.json({
+            status: 'healthy',
+            timestamp: result.rows[0].now,
+            poolStats: {
+                totalCount: pool.totalCount,
+                idleCount: pool.idleCount,
+                waitingCount: pool.waitingCount
+            }
+        });
+    } catch (error) {
+        res.status(503).json({
+            status: 'unhealthy',
+            error: error.message
+        });
+    }
+});
+
 const PORT = process.env.PORT || 4000;
 if (process.env.NODE_ENV !== 'production') {
     app.listen(PORT, () => {

@@ -1312,7 +1312,9 @@ for (const table of tables) {
                 await client.query('SET statement_timeout = 60000'); // 60 seconds
                 
                 // Check if we need to count total rows (for large datasets)
-                const countQuery = query.replace('SELECT *', 'SELECT COUNT(*) as total');
+                // Remove ORDER BY from count query to avoid GROUP BY issues
+                let countQuery = query.replace('SELECT *', 'SELECT COUNT(*) as total');
+                countQuery = countQuery.replace(/ORDER BY.*$/i, '');
                 const countResult = await client.query(countQuery, queryParams);
                 const totalRows = parseInt(countResult.rows[0].total);
                 

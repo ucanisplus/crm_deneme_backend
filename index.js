@@ -1209,9 +1209,11 @@ setTimeout(insertDefaultUserInputValues, 5000);
 for (const table of tables) {
     app.get(`/api/${table}`, async (req, res) => {
         try {
-            // URL'den sorgu parametrelerini al - ADD PAGINATION SUPPORT
+            // URL'den sorgu parametrelerini al - ADD PAGINATION AND FILTERING SUPPORT
             const { id, mm_gt_id, ym_gt_id, ym_st_id, kod_2, cap, stok_kodu, stok_kodu_like, ids, status, created_by, request_id, 
-                    limit, offset, page } = req.query;
+                    limit, offset, page,
+                    // Çelik Hasır specific filters
+                    hasir_tipi, boy_cap, en_cap, uzunluk_boy, uzunluk_en, goz_araligi, stok_adi_like } = req.query;
             
             let query = `SELECT * FROM ${table}`;
             const queryParams = [];
@@ -1285,6 +1287,50 @@ for (const table of tables) {
             if (request_id && (table === 'gal_cost_cal_mm_gt' || table === 'gal_cost_cal_ym_gt' || table === 'gal_cost_cal_ym_st')) {
                 whereConditions.push(`request_id = $${queryParams.length + 1}`);
                 queryParams.push(request_id);
+            }
+            
+            // ÇELIK HASIR SPECIFIC FILTERS - Server-side filtering for performance
+            if (table.includes('celik_hasir')) {
+                if (hasir_tipi) {
+                    whereConditions.push(`hasir_tipi = $${queryParams.length + 1}`);
+                    queryParams.push(hasir_tipi);
+                }
+                
+                if (boy_cap) {
+                    const normalizedBoyCap = typeof boy_cap === 'string' && boy_cap.includes(',') 
+                        ? parseFloat(boy_cap.replace(/,/g, '.')) 
+                        : parseFloat(boy_cap);
+                    whereConditions.push(`boy_cap = $${queryParams.length + 1}`);
+                    queryParams.push(normalizedBoyCap);
+                }
+                
+                if (en_cap) {
+                    const normalizedEnCap = typeof en_cap === 'string' && en_cap.includes(',') 
+                        ? parseFloat(en_cap.replace(/,/g, '.')) 
+                        : parseFloat(en_cap);
+                    whereConditions.push(`en_cap = $${queryParams.length + 1}`);
+                    queryParams.push(normalizedEnCap);
+                }
+                
+                if (uzunluk_boy) {
+                    whereConditions.push(`uzunluk_boy = $${queryParams.length + 1}`);
+                    queryParams.push(parseInt(uzunluk_boy));
+                }
+                
+                if (uzunluk_en) {
+                    whereConditions.push(`uzunluk_en = $${queryParams.length + 1}`);
+                    queryParams.push(parseInt(uzunluk_en));
+                }
+                
+                if (goz_araligi) {
+                    whereConditions.push(`goz_araligi = $${queryParams.length + 1}`);
+                    queryParams.push(goz_araligi);
+                }
+                
+                if (stok_adi_like) {
+                    whereConditions.push(`stok_adi ILIKE $${queryParams.length + 1}`);
+                    queryParams.push(`%${stok_adi_like}%`);
+                }
             }
             
             // WHERE koşullarını ekle
@@ -1757,6 +1803,79 @@ for (const table of tables) {
                 code: error.code,
                 stack: error.stack
             });
+        }
+    });
+}
+
+// SPECIAL ENDPOINT: Get all IDs matching filters (for "Tümünü Seç" functionality)
+for (const table of tables) {
+    app.get(`/api/${table}/ids`, async (req, res) => {
+        try {
+            // Use same filtering logic but only return IDs
+            const { hasir_tipi, boy_cap, en_cap, uzunluk_boy, uzunluk_en, goz_araligi, stok_adi_like } = req.query;
+            
+            let query = `SELECT id FROM ${table}`;
+            const queryParams = [];
+            let whereConditions = [];
+            
+            // Apply same filters as main GET endpoint
+            if (table.includes('celik_hasir')) {
+                if (hasir_tipi) {
+                    whereConditions.push(`hasir_tipi = $${queryParams.length + 1}`);
+                    queryParams.push(hasir_tipi);
+                }
+                
+                if (boy_cap) {
+                    const normalizedBoyCap = typeof boy_cap === 'string' && boy_cap.includes(',') 
+                        ? parseFloat(boy_cap.replace(/,/g, '.')) 
+                        : parseFloat(boy_cap);
+                    whereConditions.push(`boy_cap = $${queryParams.length + 1}`);
+                    queryParams.push(normalizedBoyCap);
+                }
+                
+                if (en_cap) {
+                    const normalizedEnCap = typeof en_cap === 'string' && en_cap.includes(',') 
+                        ? parseFloat(en_cap.replace(/,/g, '.')) 
+                        : parseFloat(en_cap);
+                    whereConditions.push(`en_cap = $${queryParams.length + 1}`);
+                    queryParams.push(normalizedEnCap);
+                }
+                
+                if (uzunluk_boy) {
+                    whereConditions.push(`uzunluk_boy = $${queryParams.length + 1}`);
+                    queryParams.push(parseInt(uzunluk_boy));
+                }
+                
+                if (uzunluk_en) {
+                    whereConditions.push(`uzunluk_en = $${queryParams.length + 1}`);
+                    queryParams.push(parseInt(uzunluk_en));
+                }
+                
+                if (goz_araligi) {
+                    whereConditions.push(`goz_araligi = $${queryParams.length + 1}`);
+                    queryParams.push(goz_araligi);
+                }
+                
+                if (stok_adi_like) {
+                    whereConditions.push(`stok_adi ILIKE $${queryParams.length + 1}`);
+                    queryParams.push(`%${stok_adi_like}%`);
+                }
+            }
+            
+            if (whereConditions.length > 0) {
+                query += ` WHERE ${whereConditions.join(' AND ')}`;
+            }
+            
+            console.log(`🆔 Getting all IDs for ${table} with filters:`, req.query);
+            
+            const result = await pool.query(query, queryParams);
+            const ids = result.rows.map(row => row.id);
+            
+            res.json({ ids, total: ids.length });
+            
+        } catch (error) {
+            console.error(`Error getting IDs for ${table}:`, error);
+            res.status(500).json({ error: `Failed to get IDs for ${table}` });
         }
     });
 }

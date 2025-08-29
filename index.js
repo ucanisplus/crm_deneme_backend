@@ -1209,8 +1209,9 @@ setTimeout(insertDefaultUserInputValues, 5000);
 for (const table of tables) {
     app.get(`/api/${table}`, async (req, res) => {
         try {
-            // URL'den sorgu parametrelerini al
-            const { id, mm_gt_id, ym_gt_id, ym_st_id, kod_2, cap, stok_kodu, stok_kodu_like, ids, status, created_by, request_id } = req.query;
+            // URL'den sorgu parametrelerini al - ADD PAGINATION SUPPORT
+            const { id, mm_gt_id, ym_gt_id, ym_st_id, kod_2, cap, stok_kodu, stok_kodu_like, ids, status, created_by, request_id, 
+                    limit, offset, page } = req.query;
             
             let query = `SELECT * FROM ${table}`;
             const queryParams = [];
@@ -1301,6 +1302,18 @@ for (const table of tables) {
                 query += ' ORDER BY id';
             }
             
+            // PAGINATION SUPPORT - Add LIMIT/OFFSET for large tables to prevent 504 timeouts
+            const pageSize = parseInt(limit) || (table.includes('celik_hasir') ? 100 : null); // Default 100 for celik_hasir
+            const pageNumber = parseInt(page) || 1;
+            const offsetValue = parseInt(offset) || ((pageNumber - 1) * pageSize);
+            
+            // Add pagination for large tables or when explicitly requested
+            if (pageSize && (table.includes('celik_hasir') || limit)) {
+                query += ` LIMIT $${queryParams.length + 1} OFFSET $${queryParams.length + 2}`;
+                queryParams.push(pageSize, offsetValue);
+                console.log(`📄 Pagination applied: LIMIT ${pageSize} OFFSET ${offsetValue}`);
+            }
+            
             console.log(`🔍 ${table} için sorgu:`, query);
             console.log("📝 Parametreler:", queryParams);
             
@@ -1312,10 +1325,14 @@ for (const table of tables) {
                 await client.query('SET statement_timeout = 60000'); // 60 seconds
                 
                 // Check if we need to count total rows (for large datasets)
-                // Remove ORDER BY from count query to avoid GROUP BY issues
+                // Remove ORDER BY and LIMIT/OFFSET from count query
                 let countQuery = query.replace('SELECT *', 'SELECT COUNT(*) as total');
                 countQuery = countQuery.replace(/ORDER BY.*$/i, '');
-                const countResult = await client.query(countQuery, queryParams);
+                countQuery = countQuery.replace(/LIMIT.*$/i, '');
+                
+                // Use original queryParams without pagination params for count
+                const countParams = queryParams.slice(0, -2 * (pageSize ? 1 : 0));
+                const countResult = await client.query(countQuery, countParams);
                 const totalRows = parseInt(countResult.rows[0].total);
                 
                 console.log(`📊 ${table} total rows: ${totalRows}`);

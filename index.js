@@ -4,6 +4,7 @@ const express = require('express');
 const cors = require('cors');
 const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
+const { Redis } = require('@upstash/redis');
 
 const app = express();
 // Enhanced CORS configuration for Vercel deployment
@@ -98,6 +99,94 @@ const pool = new Pool({
     statement_timeout: 60000, // 60 seconds for queries
     query_timeout: 60000 // 60 seconds
 });
+
+// Redis Configuration for Caching
+let redis;
+try {
+  if (process.env.UPSTASH_REDIS_URL && process.env.UPSTASH_REDIS_TOKEN) {
+    redis = new Redis({
+      url: process.env.UPSTASH_REDIS_URL,
+      token: process.env.UPSTASH_REDIS_TOKEN,
+    });
+    console.log('✅ Redis cache initialized successfully');
+  } else {
+    console.warn('⚠️ Redis not configured - running without cache');
+    redis = null;
+  }
+} catch (error) {
+  console.error('❌ Redis initialization failed:', error);
+  redis = null;
+}
+
+// Redis Cache Helper Functions
+const cacheHelpers = {
+  // Generate cache key for table queries
+  generateCacheKey: (table, filters = {}, page = null, limit = null) => {
+    const filterString = Object.keys(filters).length > 0 ? 
+      JSON.stringify(filters, Object.keys(filters).sort()) : 'no-filters';
+    const pageString = page ? `page:${page}` : 'no-page';
+    const limitString = limit ? `limit:${limit}` : 'no-limit';
+    return `celik_hasir:${table}:${filterString}:${pageString}:${limitString}`;
+  },
+
+  // Get from cache
+  get: async (key) => {
+    if (!redis) return null;
+    try {
+      const data = await redis.get(key);
+      if (data) {
+        console.log(`🎯 Cache HIT: ${key}`);
+        return JSON.parse(data);
+      }
+      console.log(`💨 Cache MISS: ${key}`);
+      return null;
+    } catch (error) {
+      console.error('Cache GET error:', error);
+      return null;
+    }
+  },
+
+  // Set to cache with TTL (default 5 minutes)
+  set: async (key, data, ttlSeconds = 300) => {
+    if (!redis) return false;
+    try {
+      await redis.setex(key, ttlSeconds, JSON.stringify(data));
+      console.log(`💾 Cached: ${key} (TTL: ${ttlSeconds}s)`);
+      return true;
+    } catch (error) {
+      console.error('Cache SET error:', error);
+      return false;
+    }
+  },
+
+  // Delete from cache
+  del: async (pattern) => {
+    if (!redis) return false;
+    try {
+      if (pattern.includes('*')) {
+        // Delete by pattern
+        const keys = await redis.keys(pattern);
+        if (keys.length > 0) {
+          await redis.del(...keys);
+          console.log(`🗑️ Cache cleared: ${keys.length} keys matching ${pattern}`);
+        }
+      } else {
+        // Delete single key
+        await redis.del(pattern);
+        console.log(`🗑️ Cache cleared: ${pattern}`);
+      }
+      return true;
+    } catch (error) {
+      console.error('Cache DEL error:', error);
+      return false;
+    }
+  },
+
+  // Clear all cache for a table
+  clearTableCache: async (table) => {
+    return await cacheHelpers.del(`celik_hasir:${table}:*`);
+  }
+};
 
 // Database error handling
 pool.on('error', (err) => {
@@ -1289,6 +1378,30 @@ for (const table of tables) {
                 queryParams.push(request_id);
             }
             
+            // REDIS CACHE CHECK - Before processing query for celik_hasir tables
+            if (table.includes('celik_hasir')) {
+                const filters = { hasir_tipi, boy_cap, en_cap, uzunluk_boy, uzunluk_en, goz_araligi, stok_adi_like, 
+                                 id, mm_gt_id, ym_gt_id, ym_st_id, kod_2, cap, stok_kodu, stok_kodu_like, 
+                                 ids, status, created_by, request_id };
+                
+                // Remove undefined values for cache key consistency
+                const cleanFilters = Object.fromEntries(
+                    Object.entries(filters).filter(([_, v]) => v != null && v !== undefined && v !== '')
+                );
+                
+                const cacheKey = cacheHelpers.generateCacheKey(table, cleanFilters, page, limit);
+                
+                // Try to get from cache first
+                const cachedData = await cacheHelpers.get(cacheKey);
+                if (cachedData) {
+                    // Return cached data with headers
+                    res.setHeader('X-Total-Count', cachedData.totalRows);
+                    res.setHeader('X-Cache', 'HIT');
+                    res.setHeader('Cache-Control', 'public, max-age=300'); // 5 minutes cache for browsers
+                    return res.json(cachedData.rows);
+                }
+            }
+            
             // ÇELIK HASIR SPECIFIC FILTERS - Server-side filtering for performance
             if (table.includes('celik_hasir')) {
                 if (hasir_tipi) {
@@ -1386,9 +1499,29 @@ for (const table of tables) {
                 // Execute the main query
                 const result = await client.query(query, queryParams);
                 
+                // REDIS CACHE STORE - Cache results for celik_hasir tables
+                if (table.includes('celik_hasir') && result.rows.length > 0) {
+                    const filters = { hasir_tipi, boy_cap, en_cap, uzunluk_boy, uzunluk_en, goz_araligi, stok_adi_like, 
+                                     id, mm_gt_id, ym_gt_id, ym_st_id, kod_2, cap, stok_kodu, stok_kodu_like, 
+                                     ids, status, created_by, request_id };
+                    
+                    const cleanFilters = Object.fromEntries(
+                        Object.entries(filters).filter(([_, v]) => v != null && v !== undefined && v !== '')
+                    );
+                    
+                    const cacheKey = cacheHelpers.generateCacheKey(table, cleanFilters, page, limit);
+                    
+                    // Store in cache with 5 minute TTL
+                    await cacheHelpers.set(cacheKey, {
+                        rows: result.rows,
+                        totalRows: totalRows
+                    }, 300);
+                }
+                
                 // Add total count to response headers for frontend
                 res.setHeader('X-Total-Count', totalRows);
-                res.setHeader('Cache-Control', 'no-cache'); // Prevent caching issues
+                res.setHeader('X-Cache', 'MISS');
+                res.setHeader('Cache-Control', table.includes('celik_hasir') ? 'public, max-age=300' : 'no-cache');
                 
                 // API tutarlılığı: Her zaman dizi döndür, boş sonuç için boş dizi
                 res.json(result.rows);
@@ -1654,6 +1787,12 @@ for (const table of tables) {
                   return res.status(400).json({ error: 'Hiçbir geçerli öğe eklenemedi' });
                 }
                 
+                // REDIS CACHE INVALIDATION - Clear cache when batch data is added
+                if (table.includes('celik_hasir') && results.length > 0) {
+                  await cacheHelpers.clearTableCache(table);
+                  console.log(`🗑️ Cache cleared for table: ${table} (batch insert)`);
+                }
+                
                 res.status(201).json(results);
             } else {
                 // Sayı değerlerini normalize et (virgülleri noktalara çevir)
@@ -1742,6 +1881,12 @@ for (const table of tables) {
                     } catch (notifError) {
                       console.log('Notification creation failed:', notifError);
                     }
+                  }
+                  
+                  // REDIS CACHE INVALIDATION - Clear cache when data is added
+                  if (table.includes('celik_hasir')) {
+                    await cacheHelpers.clearTableCache(table);
+                    console.log(`🗑️ Cache cleared for table: ${table}`);
                   }
                   
                   res.status(201).json(result.rows[0]);
@@ -2132,6 +2277,13 @@ for (const table of tables) {
             }
             
             await client.query('COMMIT');
+            
+            // REDIS CACHE INVALIDATION - Clear cache when data is deleted
+            if (table.includes('celik_hasir')) {
+              await cacheHelpers.clearTableCache(table);
+              console.log(`🗑️ Cache cleared for table: ${table} (delete operation)`);
+            }
+            
             console.log(`✅ Başarıyla silindi: ${table}, ID: ${id}`);
             res.json({ message: "Kayıt başarıyla silindi", deletedRecord: result.rows[0] });
         } catch (error) {

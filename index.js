@@ -1302,7 +1302,9 @@ for (const table of tables) {
             const { id, mm_gt_id, ym_gt_id, ym_st_id, kod_2, cap, stok_kodu, stok_kodu_like, ids, status, created_by, request_id, 
                     limit, offset, page,
                     // Çelik Hasır specific filters
-                    hasir_tipi, boy_cap, en_cap, uzunluk_boy, uzunluk_en, goz_araligi, stok_adi_like } = req.query;
+                    hasir_tipi, boy_cap, en_cap, uzunluk_boy, uzunluk_en, goz_araligi, stok_adi_like,
+                    // New filter parameters for database screen
+                    search, hasir_tipi_filter, hasir_turu_filter, sort_by, sort_order } = req.query;
             
             let query = `SELECT * FROM ${table}`;
             const queryParams = [];
@@ -1444,6 +1446,45 @@ for (const table of tables) {
                     whereConditions.push(`stok_adi ILIKE $${queryParams.length + 1}`);
                     queryParams.push(`%${stok_adi_like}%`);
                 }
+                
+                // NEW: Global search filter (searches multiple columns)
+                if (search) {
+                    const searchConditions = [
+                        `stok_kodu ILIKE $${queryParams.length + 1}`,
+                        `stok_adi ILIKE $${queryParams.length + 1}`,
+                        `grup_kodu ILIKE $${queryParams.length + 1}`,
+                        `kod_1 ILIKE $${queryParams.length + 1}`,
+                        `kod_2 ILIKE $${queryParams.length + 1}`
+                    ];
+                    whereConditions.push(`(${searchConditions.join(' OR ')})`);
+                    queryParams.push(`%${search}%`);
+                }
+                
+                // NEW: Hasır tipi filter for database screen
+                if (hasir_tipi_filter && hasir_tipi_filter !== 'All') {
+                    if (hasir_tipi_filter === 'Q Tipleri') {
+                        whereConditions.push(`(stok_adi ILIKE $${queryParams.length + 1} OR hasir_tipi ILIKE $${queryParams.length + 1})`);
+                        queryParams.push('%Q%');
+                    } else if (hasir_tipi_filter === 'R Tipleri') {
+                        // More specific R-type detection to avoid false matches
+                        whereConditions.push(`(stok_adi ~* $${queryParams.length + 1} OR hasir_tipi ~* $${queryParams.length + 1})`);
+                        queryParams.push('\\bR\\d+'); // R followed by digits
+                    } else if (hasir_tipi_filter === 'TR Tipleri') {
+                        whereConditions.push(`(stok_adi ILIKE $${queryParams.length + 1} OR hasir_tipi ILIKE $${queryParams.length + 1})`);
+                        queryParams.push('%TR%');
+                    }
+                }
+                
+                // NEW: Hasır türü filter for database screen
+                if (hasir_turu_filter && hasir_turu_filter !== 'All') {
+                    if (hasir_turu_filter.toLowerCase() === 'standart') {
+                        whereConditions.push(`kod_2 = $${queryParams.length + 1}`);
+                        queryParams.push('STD');
+                    } else {
+                        whereConditions.push(`hasir_turu ILIKE $${queryParams.length + 1}`);
+                        queryParams.push(hasir_turu_filter);
+                    }
+                }
             }
             
             // WHERE koşullarını ekle
@@ -1452,12 +1493,17 @@ for (const table of tables) {
             }
             
             // Sıralama ekle
-            if (table === 'gal_cost_cal_sal_requests') {
+            if (sort_by && sort_order) {
+                // Validate sort_by to prevent SQL injection
+                const allowedSortColumns = ['id', 'stok_kodu', 'stok_adi', 'cap', 'created_at', 'hasir_tipi', 'kod_2'];
+                if (allowedSortColumns.includes(sort_by)) {
+                    const order = sort_order.toLowerCase() === 'desc' ? 'DESC' : 'ASC';
+                    query += ` ORDER BY ${sort_by} ${order}`;
+                }
+            } else if (table === 'gal_cost_cal_sal_requests') {
                 query += ` ORDER BY created_at DESC`;
-            }
-            
-            // Add ordering for better performance on large datasets
-            if (table.includes('celik_hasir')) {
+            } else if (table.includes('celik_hasir')) {
+                // Default ordering for celik_hasir tables
                 query += ' ORDER BY id';
             }
             

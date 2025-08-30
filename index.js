@@ -2878,6 +2878,375 @@ app.get('/api/export/:table', async (req, res) => {
     }
 });
 
+// BULK DELETION ENDPOINTS FOR OPTIMIZED PERFORMANCE
+// These endpoints provide efficient bulk deletion by stok_kodu/mamul_kodu
+// They are designed to replace the slow individual deletion pattern
+
+// Bulk delete recipes by mamul_kodu (for all recipe tables)
+app.delete('/api/celik_hasir_netsis_mm_recete/bulk-delete-by-mamul', async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const { mamul_kodu } = req.query;
+    if (!mamul_kodu) {
+      return res.status(400).json({ error: 'mamul_kodu parameter is required' });
+    }
+
+    await client.query('BEGIN');
+    console.log(`🗑️ Bulk deleting MM recipes for mamul_kodu: ${mamul_kodu}`);
+
+    const result = await client.query(
+      'DELETE FROM celik_hasir_netsis_mm_recete WHERE mamul_kodu = $1',
+      [mamul_kodu]
+    );
+
+    await client.query('COMMIT');
+    await cacheHelpers.clearTableCache('celik_hasir_netsis_mm_recete');
+    
+    console.log(`✅ Bulk deleted ${result.rowCount} MM recipes for mamul_kodu: ${mamul_kodu}`);
+    res.json({ 
+      message: `Successfully deleted ${result.rowCount} recipes`,
+      deletedCount: result.rowCount,
+      mamul_kodu 
+    });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('❌ Bulk MM recipe deletion error:', error);
+    res.status(500).json({ error: error.message });
+  } finally {
+    client.release();
+  }
+});
+
+app.delete('/api/celik_hasir_netsis_ncbk_recete/bulk-delete-by-mamul', async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const { mamul_kodu } = req.query;
+    if (!mamul_kodu) {
+      return res.status(400).json({ error: 'mamul_kodu parameter is required' });
+    }
+
+    await client.query('BEGIN');
+    console.log(`🗑️ Bulk deleting NCBK recipes for mamul_kodu: ${mamul_kodu}`);
+
+    const result = await client.query(
+      'DELETE FROM celik_hasir_netsis_ncbk_recete WHERE mamul_kodu = $1',
+      [mamul_kodu]
+    );
+
+    await client.query('COMMIT');
+    await cacheHelpers.clearTableCache('celik_hasir_netsis_ncbk_recete');
+    
+    console.log(`✅ Bulk deleted ${result.rowCount} NCBK recipes for mamul_kodu: ${mamul_kodu}`);
+    res.json({ 
+      message: `Successfully deleted ${result.rowCount} recipes`,
+      deletedCount: result.rowCount,
+      mamul_kodu 
+    });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('❌ Bulk NCBK recipe deletion error:', error);
+    res.status(500).json({ error: error.message });
+  } finally {
+    client.release();
+  }
+});
+
+app.delete('/api/celik_hasir_netsis_ntel_recete/bulk-delete-by-mamul', async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const { mamul_kodu } = req.query;
+    if (!mamul_kodu) {
+      return res.status(400).json({ error: 'mamul_kodu parameter is required' });
+    }
+
+    await client.query('BEGIN');
+    console.log(`🗑️ Bulk deleting NTEL recipes for mamul_kodu: ${mamul_kodu}`);
+
+    const result = await client.query(
+      'DELETE FROM celik_hasir_netsis_ntel_recete WHERE mamul_kodu = $1',
+      [mamul_kodu]
+    );
+
+    await client.query('COMMIT');
+    await cacheHelpers.clearTableCache('celik_hasir_netsis_ntel_recete');
+    
+    console.log(`✅ Bulk deleted ${result.rowCount} NTEL recipes for mamul_kodu: ${mamul_kodu}`);
+    res.json({ 
+      message: `Successfully deleted ${result.rowCount} recipes`,
+      deletedCount: result.rowCount,
+      mamul_kodu 
+    });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('❌ Bulk NTEL recipe deletion error:', error);
+    res.status(500).json({ error: error.message });
+  } finally {
+    client.release();
+  }
+});
+
+// Bulk delete products by stok_kodu (for all product tables)
+app.delete('/api/celik_hasir_netsis_mm/bulk-delete-by-stok', async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const { stok_kodu } = req.query;
+    if (!stok_kodu) {
+      return res.status(400).json({ error: 'stok_kodu parameter is required' });
+    }
+
+    await client.query('BEGIN');
+    console.log(`🗑️ Bulk deleting MM products for stok_kodu: ${stok_kodu}`);
+
+    // First delete related recipes
+    const recipeResult = await client.query(
+      'DELETE FROM celik_hasir_netsis_mm_recete WHERE mamul_kodu = $1',
+      [stok_kodu]
+    );
+
+    // Then delete the product
+    const productResult = await client.query(
+      'DELETE FROM celik_hasir_netsis_mm WHERE stok_kodu = $1',
+      [stok_kodu]
+    );
+
+    await client.query('COMMIT');
+    await cacheHelpers.clearTableCache('celik_hasir_netsis_mm');
+    await cacheHelpers.clearTableCache('celik_hasir_netsis_mm_recete');
+    
+    console.log(`✅ Bulk deleted MM: ${productResult.rowCount} products, ${recipeResult.rowCount} recipes for stok_kodu: ${stok_kodu}`);
+    res.json({ 
+      message: `Successfully deleted ${productResult.rowCount} products and ${recipeResult.rowCount} recipes`,
+      deletedProducts: productResult.rowCount,
+      deletedRecipes: recipeResult.rowCount,
+      stok_kodu 
+    });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('❌ Bulk MM product deletion error:', error);
+    res.status(500).json({ error: error.message });
+  } finally {
+    client.release();
+  }
+});
+
+app.delete('/api/celik_hasir_netsis_ym_ncbk/bulk-delete-by-stok', async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const { stok_kodu } = req.query;
+    if (!stok_kodu) {
+      return res.status(400).json({ error: 'stok_kodu parameter is required' });
+    }
+
+    await client.query('BEGIN');
+    console.log(`🗑️ Bulk deleting NCBK products for stok_kodu: ${stok_kodu}`);
+
+    // First delete related recipes
+    const recipeResult = await client.query(
+      'DELETE FROM celik_hasir_netsis_ncbk_recete WHERE mamul_kodu = $1',
+      [stok_kodu]
+    );
+
+    // Then delete the product
+    const productResult = await client.query(
+      'DELETE FROM celik_hasir_netsis_ym_ncbk WHERE stok_kodu = $1',
+      [stok_kodu]
+    );
+
+    await client.query('COMMIT');
+    await cacheHelpers.clearTableCache('celik_hasir_netsis_ym_ncbk');
+    await cacheHelpers.clearTableCache('celik_hasir_netsis_ncbk_recete');
+    
+    console.log(`✅ Bulk deleted NCBK: ${productResult.rowCount} products, ${recipeResult.rowCount} recipes for stok_kodu: ${stok_kodu}`);
+    res.json({ 
+      message: `Successfully deleted ${productResult.rowCount} products and ${recipeResult.rowCount} recipes`,
+      deletedProducts: productResult.rowCount,
+      deletedRecipes: recipeResult.rowCount,
+      stok_kodu 
+    });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('❌ Bulk NCBK product deletion error:', error);
+    res.status(500).json({ error: error.message });
+  } finally {
+    client.release();
+  }
+});
+
+app.delete('/api/celik_hasir_netsis_ym_ntel/bulk-delete-by-stok', async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const { stok_kodu } = req.query;
+    if (!stok_kodu) {
+      return res.status(400).json({ error: 'stok_kodu parameter is required' });
+    }
+
+    await client.query('BEGIN');
+    console.log(`🗑️ Bulk deleting NTEL products for stok_kodu: ${stok_kodu}`);
+
+    // First delete related recipes
+    const recipeResult = await client.query(
+      'DELETE FROM celik_hasir_netsis_ntel_recete WHERE mamul_kodu = $1',
+      [stok_kodu]
+    );
+
+    // Then delete the product
+    const productResult = await client.query(
+      'DELETE FROM celik_hasir_netsis_ym_ntel WHERE stok_kodu = $1',
+      [stok_kodu]
+    );
+
+    await client.query('COMMIT');
+    await cacheHelpers.clearTableCache('celik_hasir_netsis_ym_ntel');
+    await cacheHelpers.clearTableCache('celik_hasir_netsis_ntel_recete');
+    
+    console.log(`✅ Bulk deleted NTEL: ${productResult.rowCount} products, ${recipeResult.rowCount} recipes for stok_kodu: ${stok_kodu}`);
+    res.json({ 
+      message: `Successfully deleted ${productResult.rowCount} products and ${recipeResult.rowCount} recipes`,
+      deletedProducts: productResult.rowCount,
+      deletedRecipes: recipeResult.rowCount,
+      stok_kodu 
+    });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('❌ Bulk NTEL product deletion error:', error);
+    res.status(500).json({ error: error.message });
+  } finally {
+    client.release();
+  }
+});
+
+// Bulk delete all products and recipes for a specific type
+app.delete('/api/celik_hasir_netsis_mm/bulk-delete-all', async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    console.log(`🗑️ Bulk deleting ALL MM products and recipes`);
+
+    // First delete all recipes
+    const recipeResult = await client.query('DELETE FROM celik_hasir_netsis_mm_recete');
+
+    // Then delete all products
+    const productResult = await client.query('DELETE FROM celik_hasir_netsis_mm');
+
+    await client.query('COMMIT');
+    await cacheHelpers.clearTableCache('celik_hasir_netsis_mm');
+    await cacheHelpers.clearTableCache('celik_hasir_netsis_mm_recete');
+    
+    console.log(`✅ Bulk deleted ALL MM: ${productResult.rowCount} products, ${recipeResult.rowCount} recipes`);
+    res.json({ 
+      message: `Successfully deleted all MM data: ${productResult.rowCount} products and ${recipeResult.rowCount} recipes`,
+      deletedProducts: productResult.rowCount,
+      deletedRecipes: recipeResult.rowCount
+    });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('❌ Bulk delete all MM error:', error);
+    res.status(500).json({ error: error.message });
+  } finally {
+    client.release();
+  }
+});
+
+app.delete('/api/celik_hasir_netsis_ym_ncbk/bulk-delete-all', async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    console.log(`🗑️ Bulk deleting ALL NCBK products and recipes`);
+
+    // First delete all recipes
+    const recipeResult = await client.query('DELETE FROM celik_hasir_netsis_ncbk_recete');
+
+    // Then delete all products
+    const productResult = await client.query('DELETE FROM celik_hasir_netsis_ym_ncbk');
+
+    await client.query('COMMIT');
+    await cacheHelpers.clearTableCache('celik_hasir_netsis_ym_ncbk');
+    await cacheHelpers.clearTableCache('celik_hasir_netsis_ncbk_recete');
+    
+    console.log(`✅ Bulk deleted ALL NCBK: ${productResult.rowCount} products, ${recipeResult.rowCount} recipes`);
+    res.json({ 
+      message: `Successfully deleted all NCBK data: ${productResult.rowCount} products and ${recipeResult.rowCount} recipes`,
+      deletedProducts: productResult.rowCount,
+      deletedRecipes: recipeResult.rowCount
+    });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('❌ Bulk delete all NCBK error:', error);
+    res.status(500).json({ error: error.message });
+  } finally {
+    client.release();
+  }
+});
+
+app.delete('/api/celik_hasir_netsis_ym_ntel/bulk-delete-all', async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    console.log(`🗑️ Bulk deleting ALL NTEL products and recipes`);
+
+    // First delete all recipes
+    const recipeResult = await client.query('DELETE FROM celik_hasir_netsis_ntel_recete');
+
+    // Then delete all products
+    const productResult = await client.query('DELETE FROM celik_hasir_netsis_ym_ntel');
+
+    await client.query('COMMIT');
+    await cacheHelpers.clearTableCache('celik_hasir_netsis_ym_ntel');
+    await cacheHelpers.clearTableCache('celik_hasir_netsis_ntel_recete');
+    
+    console.log(`✅ Bulk deleted ALL NTEL: ${productResult.rowCount} products, ${recipeResult.rowCount} recipes`);
+    res.json({ 
+      message: `Successfully deleted all NTEL data: ${productResult.rowCount} products and ${recipeResult.rowCount} recipes`,
+      deletedProducts: productResult.rowCount,
+      deletedRecipes: recipeResult.rowCount
+    });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('❌ Bulk delete all NTEL error:', error);
+    res.status(500).json({ error: error.message });
+  } finally {
+    client.release();
+  }
+});
+
+// CH Sequence reset endpoint
+app.post('/api/celik_hasir_netsis_sequence/reset-ch-sequences', async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    console.log(`🔄 Resetting CH sequences`);
+
+    // Reset OZL and OZL_BACKUP sequences to 0
+    const ozlResult = await client.query(`
+      UPDATE celik_hasir_netsis_sequence 
+      SET sequence = 0, updated_at = NOW()
+      WHERE product_type = 'CH' AND kod_2 = 'OZL'
+    `);
+
+    const ozlBackupResult = await client.query(`
+      UPDATE celik_hasir_netsis_sequence 
+      SET sequence = 0, updated_at = NOW()
+      WHERE product_type = 'CH' AND kod_2 = 'OZL_BACKUP'
+    `);
+
+    await client.query('COMMIT');
+    await cacheHelpers.clearTableCache('celik_hasir_netsis_sequence');
+    
+    console.log(`✅ Reset CH sequences: OZL=${ozlResult.rowCount}, OZL_BACKUP=${ozlBackupResult.rowCount}`);
+    res.json({ 
+      message: `Successfully reset CH sequences`,
+      ozl_updated: ozlResult.rowCount,
+      ozl_backup_updated: ozlBackupResult.rowCount
+    });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('❌ CH sequence reset error:', error);
+    res.status(500).json({ error: error.message });
+  } finally {
+    client.release();
+  }
+});
+
 // Add health check endpoint for monitoring
 app.get('/api/health', async (req, res) => {
     try {

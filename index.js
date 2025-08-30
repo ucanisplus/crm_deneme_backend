@@ -2429,9 +2429,40 @@ app.delete('/api/celik_hasir_netsis_mm/bulk-delete-by-stok', async (req, res) =>
       [stok_kodu]
     );
 
+    // Update sequence table after deletion if this is an OZL product
+    if (stok_kodu.startsWith('CHOZL')) {
+      try {
+        // Extract sequence number from stok_kodu (e.g., CHOZL2450 -> 2450)
+        const sequenceMatch = stok_kodu.match(/CHOZL(\d+)/);
+        if (sequenceMatch) {
+          // Find the highest remaining sequence number for OZL products
+          const maxSeqResult = await client.query(`
+            SELECT COALESCE(MAX(CAST(SUBSTRING(stok_kodu FROM 'CHOZL(\\d+)') AS INTEGER)), 0) as max_seq
+            FROM celik_hasir_netsis_mm 
+            WHERE stok_kodu ~ '^CHOZL\\d+$'
+          `);
+          
+          const newMaxSeq = maxSeqResult.rows[0].max_seq;
+          
+          // Update both OZL and OZL_BACKUP sequences
+          await client.query(`
+            UPDATE celik_hasir_netsis_sequence 
+            SET last_sequence = $1, updated_at = NOW()
+            WHERE product_type = 'CH' AND kod_2 IN ('OZL', 'OZL_BACKUP')
+          `, [newMaxSeq]);
+          
+          console.log(`📊 Updated OZL sequence to ${newMaxSeq} after deleting ${stok_kodu}`);
+        }
+      } catch (seqError) {
+        console.error('❌ Sequence update error (non-critical):', seqError.message);
+        // Don't fail the deletion if sequence update fails
+      }
+    }
+
     await client.query('COMMIT');
     await cacheHelpers.clearTableCache('celik_hasir_netsis_mm');
     await cacheHelpers.clearTableCache('celik_hasir_netsis_mm_recete');
+    await cacheHelpers.clearTableCache('celik_hasir_netsis_sequence');
     
     console.log(`✅ Bulk deleted MM: ${productResult.rowCount} products, ${recipeResult.rowCount} recipes for stok_kodu: ${stok_kodu}`);
     res.json({ 

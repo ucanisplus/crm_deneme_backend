@@ -1312,23 +1312,30 @@ for (const table of tables) {
             
             // Sorgu parametrelerine göre WHERE koşullarını oluştur
             if (id) {
+                const parsedId = typeof id === 'string' ? parseInt(id, 10) : id;
                 whereConditions.push(`id = $${queryParams.length + 1}`);
-                queryParams.push(id);
+                queryParams.push(parsedId);
             }
             
             if (mm_gt_id) {
+                console.log(`🔍 Processing mm_gt_id parameter: "${mm_gt_id}" (type: ${typeof mm_gt_id})`);
+                // Convert to integer if it's a string number
+                const parsedId = typeof mm_gt_id === 'string' ? parseInt(mm_gt_id, 10) : mm_gt_id;
+                console.log(`🔍 Parsed mm_gt_id: ${parsedId} (type: ${typeof parsedId})`);
                 whereConditions.push(`mm_gt_id = $${queryParams.length + 1}`);
-                queryParams.push(mm_gt_id);
+                queryParams.push(parsedId);
             }
             
             if (ym_gt_id) {
+                const parsedYmGtId = typeof ym_gt_id === 'string' ? parseInt(ym_gt_id, 10) : ym_gt_id;
                 whereConditions.push(`ym_gt_id = $${queryParams.length + 1}`);
-                queryParams.push(ym_gt_id);
+                queryParams.push(parsedYmGtId);
             }
             
             if (ym_st_id) {
+                const parsedYmStId = typeof ym_st_id === 'string' ? parseInt(ym_st_id, 10) : ym_st_id;
                 whereConditions.push(`ym_st_id = $${queryParams.length + 1}`);
-                queryParams.push(ym_st_id);
+                queryParams.push(parsedYmStId);
             }
             
             if (kod_2 && cap) {

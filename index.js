@@ -1465,15 +1465,17 @@ for (const table of tables) {
                 
                 // NEW: Global search filter (searches multiple columns)
                 if (search) {
+                    const searchTerm = `%${search}%`;
                     const searchConditions = [
                         `stok_kodu ILIKE $${queryParams.length + 1}`,
-                        `stok_adi ILIKE $${queryParams.length + 1}`,
-                        `grup_kodu ILIKE $${queryParams.length + 1}`,
-                        `kod_1 ILIKE $${queryParams.length + 1}`,
-                        `kod_2 ILIKE $${queryParams.length + 1}`
+                        `stok_adi ILIKE $${queryParams.length + 2}`,
+                        `grup_kodu ILIKE $${queryParams.length + 3}`,
+                        `kod_1 ILIKE $${queryParams.length + 4}`,
+                        `kod_2 ILIKE $${queryParams.length + 5}`
                     ];
                     whereConditions.push(`(${searchConditions.join(' OR ')})`);
-                    queryParams.push(`%${search}%`);
+                    // Add the same search term for each condition
+                    queryParams.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
                 }
                 
                 // NEW: Hasır tipi filter for database screen

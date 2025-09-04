@@ -1389,16 +1389,12 @@ for (const table of tables) {
                 queryParams.push(request_id);
             }
             
-            // Mamul kodu filtreleme - Recipe tabloları için - TEMPORARILY DISABLED DUE TO 504 ERRORS
-            // if (mamul_kodu && table && typeof table === 'string' && table.includes('_recete')) {
-            //     try {
-            //         whereConditions.push(`mamul_kodu = $${queryParams.length + 1}`);
-            //         queryParams.push(mamul_kodu);
-            //         console.log(`🔍 Filtering ${table} by mamul_kodu: ${mamul_kodu}`);
-            //     } catch (error) {
-            //         console.error('Error adding mamul_kodu filter:', error);
-            //     }
-            // }
+            // Mamul kodu filtreleme - Recipe tabloları için (celik_hasir_netsis_mm_recete, ncbk_recete, ntel_recete)
+            if (mamul_kodu && table && table.includes('_recete')) {
+                whereConditions.push(`mamul_kodu = $${queryParams.length + 1}`);
+                queryParams.push(mamul_kodu);
+                console.log(`🔍 Filtering ${table} by mamul_kodu: ${mamul_kodu}`);
+            }
             
             // REDIS CACHE CHECK - Before processing query for celik_hasir tables
             if (table.includes('celik_hasir')) {

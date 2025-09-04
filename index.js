@@ -1523,13 +1523,13 @@ for (const table of tables) {
                 query += ' ORDER BY id';
             }
             
-            // PAGINATION SUPPORT - Add LIMIT/OFFSET for large tables to prevent 504 timeouts
-            const pageSize = parseInt(limit) || (table.includes('celik_hasir') ? 100 : null); // Default 100 for celik_hasir
+            // PAGINATION SUPPORT - Only apply pagination when explicitly requested via limit parameter
+            const pageSize = parseInt(limit) || null; // No default limit anymore
             const pageNumber = parseInt(page) || 1;
-            const offsetValue = parseInt(offset) || ((pageNumber - 1) * pageSize);
+            const offsetValue = parseInt(offset) || ((pageNumber - 1) * (pageSize || 0));
             
-            // Add pagination for large tables or when explicitly requested
-            if (pageSize && (table.includes('celik_hasir') || limit)) {
+            // Add pagination only when explicitly requested
+            if (pageSize && pageSize > 0) {
                 query += ` LIMIT $${queryParams.length + 1} OFFSET $${queryParams.length + 2}`;
                 queryParams.push(pageSize, offsetValue);
                 console.log(`📄 Pagination applied: LIMIT ${pageSize} OFFSET ${offsetValue}`);

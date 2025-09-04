@@ -1361,16 +1361,20 @@ for (const table of tables) {
             }
             
             if (stok_kodu) {
-                whereConditions.push(`stok_kodu = $${queryParams.length + 1}`);
+                console.log(`🔍 [${table}] Processing stok_kodu: "${stok_kodu}"`);
+                const paramIndex = queryParams.length + 1;
+                whereConditions.push(`stok_kodu = $${paramIndex}`);
                 queryParams.push(stok_kodu);
+                console.log(`🔍 [${table}] Added stok_kodu condition, param index: ${paramIndex}, params count: ${queryParams.length}`);
             }
             
             // Pattern arama için LIKE operatörü
             if (stok_kodu_like) {
                 console.log(`🔍 [${table}] Processing stok_kodu_like: "${stok_kodu_like}"`);
-                whereConditions.push(`stok_kodu LIKE $${queryParams.length + 1}`);
+                const paramIndex = queryParams.length + 1;
+                whereConditions.push(`stok_kodu LIKE $${paramIndex}`);
                 queryParams.push(`${stok_kodu_like}%`);
-                console.log(`🔍 [${table}] Added condition, params count: ${queryParams.length}`);
+                console.log(`🔍 [${table}] Added stok_kodu_like condition, param index: ${paramIndex}, params count: ${queryParams.length}`);
             }
             
             // Çoklu ID araması için
@@ -1511,6 +1515,22 @@ for (const table of tables) {
                         whereConditions.push(`hasir_turu ILIKE $${queryParams.length + 1}`);
                         queryParams.push(hasir_turu_filter);
                     }
+                }
+            }
+            
+            // 🚨 GALVANIZLI TEL DEBUGGING: Check WHERE conditions and params before WHERE clause
+            if (table === 'gal_cost_cal_mm_gt') {
+                console.log(`🚨 [GALVANIZLI TEL] WHERE conditions before construction:`, whereConditions);
+                console.log(`🚨 [GALVANIZLI TEL] Query params before WHERE:`, queryParams);
+                console.log(`🚨 [GALVANIZLI TEL] Conditions count: ${whereConditions.length}, Params count: ${queryParams.length}`);
+                
+                // 🚨 CRITICAL FIX: Ensure parameter count matches placeholders
+                const paramPlaceholderCount = whereConditions.join(' ').match(/\$\d+/g)?.length || 0;
+                if (paramPlaceholderCount !== queryParams.length) {
+                    console.log(`🚨 [GALVANIZLI TEL CRITICAL] Parameter mismatch detected!`);
+                    console.log(`🚨 [GALVANIZLI TEL CRITICAL] Placeholders in conditions: ${paramPlaceholderCount}`);
+                    console.log(`🚨 [GALVANIZLI TEL CRITICAL] Actual parameters: ${queryParams.length}`);
+                    console.log(`🚨 [GALVANIZLI TEL CRITICAL] Conditions with placeholders:`, whereConditions);
                 }
             }
             

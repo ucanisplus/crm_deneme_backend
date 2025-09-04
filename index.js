@@ -1360,8 +1360,10 @@ for (const table of tables) {
             
             // Pattern arama için LIKE operatörü
             if (stok_kodu_like) {
+                console.log(`🔍 [${table}] Processing stok_kodu_like: "${stok_kodu_like}"`);
                 whereConditions.push(`stok_kodu LIKE $${queryParams.length + 1}`);
                 queryParams.push(`${stok_kodu_like}%`);
+                console.log(`🔍 [${table}] Added condition, params count: ${queryParams.length}`);
             }
             
             // Çoklu ID araması için
@@ -1481,15 +1483,15 @@ for (const table of tables) {
                 // NEW: Hasır tipi filter for database screen
                 if (hasir_tipi_filter && hasir_tipi_filter !== 'All') {
                     if (hasir_tipi_filter === 'Q Tipleri') {
-                        whereConditions.push(`(stok_adi ILIKE $${queryParams.length + 1} OR hasir_tipi ILIKE $${queryParams.length + 1})`);
-                        queryParams.push('%Q%');
+                        whereConditions.push(`(stok_adi ILIKE $${queryParams.length + 1} OR hasir_tipi ILIKE $${queryParams.length + 2})`);
+                        queryParams.push('%Q%', '%Q%');
                     } else if (hasir_tipi_filter === 'R Tipleri') {
                         // More specific R-type detection to avoid false matches
-                        whereConditions.push(`(stok_adi ~* $${queryParams.length + 1} OR hasir_tipi ~* $${queryParams.length + 1})`);
-                        queryParams.push('\\bR\\d+'); // R followed by digits
+                        whereConditions.push(`(stok_adi ~* $${queryParams.length + 1} OR hasir_tipi ~* $${queryParams.length + 2})`);
+                        queryParams.push('\\bR\\d+', '\\bR\\d+'); // R followed by digits
                     } else if (hasir_tipi_filter === 'TR Tipleri') {
-                        whereConditions.push(`(stok_adi ILIKE $${queryParams.length + 1} OR hasir_tipi ILIKE $${queryParams.length + 1})`);
-                        queryParams.push('%TR%');
+                        whereConditions.push(`(stok_adi ILIKE $${queryParams.length + 1} OR hasir_tipi ILIKE $${queryParams.length + 2})`);
+                        queryParams.push('%TR%', '%TR%');
                     }
                 }
                 
@@ -1508,6 +1510,13 @@ for (const table of tables) {
             // WHERE koşullarını ekle
             if (whereConditions.length > 0) {
                 query += ` WHERE ${whereConditions.join(' AND ')}`;
+            }
+            
+            // DEBUG: Log final query and parameters for galvanizli tel tables
+            if (table.includes('gal_cost_cal')) {
+                console.log(`🔍 [${table}] Final query: "${query}"`);
+                console.log(`🔍 [${table}] Parameters: [${queryParams.map(p => `"${p}"`).join(', ')}]`);
+                console.log(`🔍 [${table}] Where conditions: [${whereConditions.join(', ')}]`);
             }
             
             // Sıralama ekle

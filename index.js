@@ -1303,6 +1303,8 @@ for (const table of tables) {
                     limit, offset, page,
                     // Çelik Hasır specific filters
                     hasir_tipi, boy_cap, en_cap, uzunluk_boy, uzunluk_en, goz_araligi, stok_adi_like,
+                    // Recipe table specific filter
+                    mamul_kodu,
                     // New filter parameters for database screen
                     search, hasir_tipi_filter, hasir_turu_filter, sort_by, sort_order } = req.query;
             
@@ -1387,11 +1389,18 @@ for (const table of tables) {
                 queryParams.push(request_id);
             }
             
+            // Mamul kodu filtreleme - Recipe tabloları için (celik_hasir_netsis_mm_recete, ncbk_recete, ntel_recete)
+            if (mamul_kodu && table.includes('_recete')) {
+                whereConditions.push(`mamul_kodu = $${queryParams.length + 1}`);
+                queryParams.push(mamul_kodu);
+                console.log(`🔍 Filtering ${table} by mamul_kodu: ${mamul_kodu}`);
+            }
+            
             // REDIS CACHE CHECK - Before processing query for celik_hasir tables
             if (table.includes('celik_hasir')) {
                 const filters = { hasir_tipi, boy_cap, en_cap, uzunluk_boy, uzunluk_en, goz_araligi, stok_adi_like, 
                                  id, mm_gt_id, ym_gt_id, ym_st_id, kod_2, cap, stok_kodu, stok_kodu_like, 
-                                 ids, status, created_by, request_id };
+                                 ids, status, created_by, request_id, mamul_kodu };
                 
                 // Remove undefined values for cache key consistency
                 const cleanFilters = Object.fromEntries(

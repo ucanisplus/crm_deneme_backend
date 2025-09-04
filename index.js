@@ -1476,32 +1476,36 @@ for (const table of tables) {
                     queryParams.push(`%${stok_adi_like}%`);
                 }
                 
-                // NEW: Global search filter (searches multiple columns)
+                // NEW: Global search filter (searches multiple columns) - FIXED PARAMETER INDEXING
                 if (search) {
                     const searchTerm = `%${search}%`;
+                    const startIndex = queryParams.length + 1;
                     const searchConditions = [
-                        `stok_kodu ILIKE $${queryParams.length + 1}`,
-                        `stok_adi ILIKE $${queryParams.length + 2}`,
-                        `grup_kodu ILIKE $${queryParams.length + 3}`,
-                        `kod_1 ILIKE $${queryParams.length + 4}`,
-                        `kod_2 ILIKE $${queryParams.length + 5}`
+                        `stok_kodu ILIKE $${startIndex}`,
+                        `stok_adi ILIKE $${startIndex + 1}`,
+                        `grup_kodu ILIKE $${startIndex + 2}`,
+                        `kod_1 ILIKE $${startIndex + 3}`,
+                        `kod_2 ILIKE $${startIndex + 4}`
                     ];
                     whereConditions.push(`(${searchConditions.join(' OR ')})`);
                     // Add the same search term for each condition
                     queryParams.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
                 }
                 
-                // NEW: Hasır tipi filter for database screen
+                // NEW: Hasır tipi filter for database screen - FIXED PARAMETER INDEXING
                 if (hasir_tipi_filter && hasir_tipi_filter !== 'All') {
                     if (hasir_tipi_filter === 'Q Tipleri') {
-                        whereConditions.push(`(stok_adi ILIKE $${queryParams.length + 1} OR hasir_tipi ILIKE $${queryParams.length + 2})`);
+                        const startIndex = queryParams.length + 1;
+                        whereConditions.push(`(stok_adi ILIKE $${startIndex} OR hasir_tipi ILIKE $${startIndex + 1})`);
                         queryParams.push('%Q%', '%Q%');
                     } else if (hasir_tipi_filter === 'R Tipleri') {
                         // More specific R-type detection to avoid false matches
-                        whereConditions.push(`(stok_adi ~* $${queryParams.length + 1} OR hasir_tipi ~* $${queryParams.length + 2})`);
+                        const startIndex = queryParams.length + 1;
+                        whereConditions.push(`(stok_adi ~* $${startIndex} OR hasir_tipi ~* $${startIndex + 1})`);
                         queryParams.push('\\bR\\d+', '\\bR\\d+'); // R followed by digits
                     } else if (hasir_tipi_filter === 'TR Tipleri') {
-                        whereConditions.push(`(stok_adi ILIKE $${queryParams.length + 1} OR hasir_tipi ILIKE $${queryParams.length + 2})`);
+                        const startIndex = queryParams.length + 1;
+                        whereConditions.push(`(stok_adi ILIKE $${startIndex} OR hasir_tipi ILIKE $${startIndex + 1})`);
                         queryParams.push('%TR%', '%TR%');
                     }
                 }
@@ -1566,9 +1570,11 @@ for (const table of tables) {
             const pageNumber = parseInt(page) || 1;
             const offsetValue = parseInt(offset) || ((pageNumber - 1) * (pageSize || 0));
             
-            // Add pagination only when explicitly requested
+            // Add pagination only when explicitly requested - FIXED PARAMETER INDEXING
             if (pageSize && pageSize > 0) {
-                query += ` LIMIT $${queryParams.length + 1} OFFSET $${queryParams.length + 2}`;
+                const limitIndex = queryParams.length + 1;
+                const offsetIndex = queryParams.length + 2;
+                query += ` LIMIT $${limitIndex} OFFSET $${offsetIndex}`;
                 queryParams.push(pageSize, offsetValue);
                 console.log(`📄 Pagination applied: LIMIT ${pageSize} OFFSET ${offsetValue}`);
             }

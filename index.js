@@ -1298,6 +1298,13 @@ setTimeout(insertDefaultUserInputValues, 5000);
 for (const table of tables) {
     app.get(`/api/${table}`, async (req, res) => {
         try {
+            // 🚨 GALVANIZLI TEL DEBUGGING: Log all requests to gal_cost_cal_mm_gt
+            if (table === 'gal_cost_cal_mm_gt') {
+                console.log(`🚨 [GALVANIZLI TEL] GET request to ${table}`);
+                console.log(`🚨 [GALVANIZLI TEL] Query params:`, req.query);
+                console.log(`🚨 [GALVANIZLI TEL] URL:`, req.url);
+            }
+            
             // URL'den sorgu parametrelerini al - ADD PAGINATION AND FILTERING SUPPORT
             const { id, mm_gt_id, ym_gt_id, ym_st_id, kod_2, cap, stok_kodu, stok_kodu_like, ids, status, created_by, request_id, 
                     limit, offset, page,
@@ -1569,6 +1576,13 @@ for (const table of tables) {
                 
                 console.log(`📊 ${table} total rows: ${totalRows}`);
                 
+                // 🚨 GALVANIZLI TEL DEBUGGING: Log query execution details
+                if (table === 'gal_cost_cal_mm_gt') {
+                    console.log(`🚨 [GALVANIZLI TEL] Final query:`, query);
+                    console.log(`🚨 [GALVANIZLI TEL] Query parameters:`, queryParams);
+                    console.log(`🚨 [GALVANIZLI TEL] Params count: ${queryParams.length}`);
+                }
+                
                 // Execute the main query
                 const result = await client.query(query, queryParams);
                 
@@ -1603,6 +1617,14 @@ for (const table of tables) {
                 client.release();
             }
         } catch (error) {
+            // 🚨 GALVANIZLI TEL DEBUGGING: Log errors for gal_cost_cal_mm_gt
+            if (table === 'gal_cost_cal_mm_gt') {
+                console.log(`🚨 [GALVANIZLI TEL ERROR] Error in ${table}:`, error);
+                console.log(`🚨 [GALVANIZLI TEL ERROR] Error code:`, error.code);
+                console.log(`🚨 [GALVANIZLI TEL ERROR] Error message:`, error.message);
+                console.log(`🚨 [GALVANIZLI TEL ERROR] Query params that caused error:`, req.query);
+            }
+            
             console.error(`${table} tablosundan veri getirme hatası:`, error);
             
             // Better error handling for different error types

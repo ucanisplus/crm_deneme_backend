@@ -1305,15 +1305,15 @@ for (const table of tables) {
                 console.log(`🚨 [GALVANIZLI TEL] URL:`, req.url);
             }
             
-            // URL'den sorgu parametrelerini al - ADD PAGINATION AND FILTERING SUPPORT
+            // URL'den sorgu parametrelerini al - SIMPLIFIED TO MATCH WORKING VERSION
             const { id, mm_gt_id, ym_gt_id, ym_st_id, kod_2, cap, stok_kodu, stok_kodu_like, ids, status, created_by, request_id, 
                     limit, offset, page,
-                    // Çelik Hasır specific filters
+                    // Çelik Hasır specific filters (keep these for celik hasir)
                     hasir_tipi, boy_cap, en_cap, uzunluk_boy, uzunluk_en, goz_araligi, stok_adi_like,
                     // Recipe table specific filter
                     mamul_kodu,
-                    // New filter parameters for database screen
-                    search, hasir_tipi_filter, hasir_turu_filter, sort_by, sort_order } = req.query;
+                    // Basic sorting (keep simple)
+                    sort_by, sort_order } = req.query;
             
             let query = `SELECT * FROM ${table}`;
             const queryParams = [];
@@ -1476,50 +1476,6 @@ for (const table of tables) {
                     queryParams.push(`%${stok_adi_like}%`);
                 }
                 
-                // NEW: Global search filter (searches multiple columns) - FIXED PARAMETER INDEXING
-                if (search) {
-                    const searchTerm = `%${search}%`;
-                    const startIndex = queryParams.length + 1;
-                    const searchConditions = [
-                        `stok_kodu ILIKE $${startIndex}`,
-                        `stok_adi ILIKE $${startIndex + 1}`,
-                        `grup_kodu ILIKE $${startIndex + 2}`,
-                        `kod_1 ILIKE $${startIndex + 3}`,
-                        `kod_2 ILIKE $${startIndex + 4}`
-                    ];
-                    whereConditions.push(`(${searchConditions.join(' OR ')})`);
-                    // Add the same search term for each condition
-                    queryParams.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
-                }
-                
-                // NEW: Hasır tipi filter for database screen - FIXED PARAMETER INDEXING
-                if (hasir_tipi_filter && hasir_tipi_filter !== 'All') {
-                    if (hasir_tipi_filter === 'Q Tipleri') {
-                        const startIndex = queryParams.length + 1;
-                        whereConditions.push(`(stok_adi ILIKE $${startIndex} OR hasir_tipi ILIKE $${startIndex + 1})`);
-                        queryParams.push('%Q%', '%Q%');
-                    } else if (hasir_tipi_filter === 'R Tipleri') {
-                        // More specific R-type detection to avoid false matches
-                        const startIndex = queryParams.length + 1;
-                        whereConditions.push(`(stok_adi ~* $${startIndex} OR hasir_tipi ~* $${startIndex + 1})`);
-                        queryParams.push('\\bR\\d+', '\\bR\\d+'); // R followed by digits
-                    } else if (hasir_tipi_filter === 'TR Tipleri') {
-                        const startIndex = queryParams.length + 1;
-                        whereConditions.push(`(stok_adi ILIKE $${startIndex} OR hasir_tipi ILIKE $${startIndex + 1})`);
-                        queryParams.push('%TR%', '%TR%');
-                    }
-                }
-                
-                // NEW: Hasır türü filter for database screen
-                if (hasir_turu_filter && hasir_turu_filter !== 'All') {
-                    if (hasir_turu_filter.toLowerCase() === 'standart') {
-                        whereConditions.push(`kod_2 = $${queryParams.length + 1}`);
-                        queryParams.push('STD');
-                    } else {
-                        whereConditions.push(`hasir_turu ILIKE $${queryParams.length + 1}`);
-                        queryParams.push(hasir_turu_filter);
-                    }
-                }
             }
             
             // 🚨 GALVANIZLI TEL DEBUGGING: Check WHERE conditions and params before WHERE clause

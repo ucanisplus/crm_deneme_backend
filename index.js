@@ -92,12 +92,12 @@ app.use((req, res, next) => {
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
     ssl: { rejectUnauthorized: false },
-    // Performance optimizations
-    max: 20, // Increase max connections from default 10
-    idleTimeoutMillis: 30000, // 30 seconds
-    connectionTimeoutMillis: 10000, // 10 seconds
-    statement_timeout: 60000, // 60 seconds for queries
-    query_timeout: 60000 // 60 seconds
+    // Performance optimizations for Vercel serverless
+    max: 3, // Reduce for serverless (was 20)
+    idleTimeoutMillis: 10000, // 10 seconds (was 30)
+    connectionTimeoutMillis: 5000, // 5 seconds (was 10)
+    statement_timeout: 9000, // 9 seconds for Vercel's 10-second limit
+    query_timeout: 9000 // 9 seconds
 });
 
 // Redis Configuration for Caching
@@ -1353,6 +1353,10 @@ for (const table of tables) {
             
             // Pattern arama için LIKE operatörü
             if (stok_kodu_like) {
+                // Optimize LIKE queries for sequence checking - only need stok_kodu field
+                if (table.includes('gal_cost_cal') && !id && !ids) {
+                    query = `SELECT stok_kodu FROM ${table}`; // Only fetch stok_kodu for performance
+                }
                 whereConditions.push(`stok_kodu LIKE $${queryParams.length + 1}`);
                 queryParams.push(`${stok_kodu_like}%`);
             }
@@ -1503,7 +1507,7 @@ for (const table of tables) {
             }
             
             // PAGINATION SUPPORT - Only apply pagination when explicitly requested via limit parameter
-            const pageSize = parseInt(limit) || null; // No default limit anymore
+            const pageSize = parseInt(limit) || null; // No default limit
             const pageNumber = parseInt(page) || 1;
             const offsetValue = parseInt(offset) || ((pageNumber - 1) * (pageSize || 0));
             

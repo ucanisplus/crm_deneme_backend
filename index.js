@@ -1670,8 +1670,8 @@ for (const table of tables) {
                     console.log(`🚨 [${table}] Count query:`, countQuery);
                 }
                 
-                // Use original queryParams without pagination params for count
-                const countParams = queryParams.slice(0, -2 * (pageSize ? 1 : 0));
+                // Use original queryParams for count (no pagination params to remove since we're not paginating the count)
+                const countParams = queryParams;
                 const countResult = await client.query(countQuery, countParams);
                 const totalRows = parseInt(countResult.rows[0].total);
                 
@@ -1720,7 +1720,7 @@ for (const table of tables) {
                 console.log(`🚨 [${table}] Error message:`, error.message);
                 console.log(`🚨 [${table}] Error stack:`, error.stack);
                 console.log(`🚨 [${table}] Original req.query:`, JSON.stringify(req.query, null, 2));
-                console.log(`🚨 [${table}] Query that failed:`, query || 'Query not constructed');
+                console.log(`🚨 [${table}] Query that failed:`, 'Check query construction above');
                 console.log(`🚨 [${table}] Parameters that failed:`, queryParams || []);
                 console.log(`🚨 [${table}] WHERE conditions that failed:`, whereConditions || []);
                 

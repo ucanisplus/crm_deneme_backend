@@ -1452,6 +1452,13 @@ for (const table of tables) {
             }
             
             if (stok_kodu) {
+                // For galvanizli tel exact stok_kodu lookups, optimize the query for speed
+                const tablesWithStokKodu = ['gal_cost_cal_mm_gt', 'gal_cost_cal_ym_gt', 'gal_cost_cal_ym_st'];
+                if (tablesWithStokKodu.includes(table) && !id && !ids && query.includes('SELECT *')) {
+                    // Only select essential columns for stok_kodu existence checks to speed up query
+                    query = `SELECT id, stok_kodu FROM ${table}`;
+                    console.log(`🚨 [${table}] Optimized exact stok_kodu query:`, query);
+                }
                 whereConditions.push(`stok_kodu = $${queryParams.length + 1}`);
                 queryParams.push(stok_kodu);
                 if (table.includes('gal_cost_cal')) {
@@ -2268,6 +2275,17 @@ for (const table of tables) {
                 return res.status(400).json({ error: "Güncellenecek veri yok" });
             }
             
+            // Check for stok_kodu uniqueness for galvanizli tel tables
+            if (data.stok_kodu && table.includes('gal_cost_cal')) {
+                const checkQuery = `SELECT id FROM ${table} WHERE stok_kodu = $1 AND id != $2`;
+                const checkResult = await pool.query(checkQuery, [data.stok_kodu, id]);
+                if (checkResult.rows.length > 0) {
+                    console.error(`❌ Stok kodu zaten mevcut: ${data.stok_kodu} (table: ${table}, existing id: ${checkResult.rows[0].id})`);
+                    return res.status(409).json({ error: `Stok kodu zaten mevcut: ${data.stok_kodu}` });
+                }
+                console.log(`✅ Stok kodu benzersizlik kontrolü geçildi: ${data.stok_kodu} (table: ${table})`);
+            }
+
             const updates = Object.keys(data).map((key, index) => `${key} = $${index + 1}`).join(', ');
             const values = Object.values(data);
             

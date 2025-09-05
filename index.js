@@ -1452,13 +1452,6 @@ for (const table of tables) {
             }
             
             if (stok_kodu) {
-                // For galvanizli tel exact stok_kodu lookups, optimize the query for speed
-                const tablesWithStokKodu = ['gal_cost_cal_mm_gt', 'gal_cost_cal_ym_gt', 'gal_cost_cal_ym_st'];
-                if (tablesWithStokKodu.includes(table) && !id && !ids && query.includes('SELECT *')) {
-                    // Only select essential columns for stok_kodu existence checks to speed up query
-                    query = `SELECT id, stok_kodu FROM ${table}`;
-                    console.log(`🚨 [${table}] Optimized exact stok_kodu query:`, query);
-                }
                 whereConditions.push(`stok_kodu = $${queryParams.length + 1}`);
                 queryParams.push(stok_kodu);
                 if (table.includes('gal_cost_cal')) {

@@ -2275,17 +2275,6 @@ for (const table of tables) {
                 return res.status(400).json({ error: "Güncellenecek veri yok" });
             }
             
-            // Check for stok_kodu uniqueness for galvanizli tel tables
-            if (data.stok_kodu && table.includes('gal_cost_cal')) {
-                const checkQuery = `SELECT id FROM ${table} WHERE stok_kodu = $1 AND id != $2`;
-                const checkResult = await pool.query(checkQuery, [data.stok_kodu, id]);
-                if (checkResult.rows.length > 0) {
-                    console.error(`❌ Stok kodu zaten mevcut: ${data.stok_kodu} (table: ${table}, existing id: ${checkResult.rows[0].id})`);
-                    return res.status(409).json({ error: `Stok kodu zaten mevcut: ${data.stok_kodu}` });
-                }
-                console.log(`✅ Stok kodu benzersizlik kontrolü geçildi: ${data.stok_kodu} (table: ${table})`);
-            }
-
             const updates = Object.keys(data).map((key, index) => `${key} = $${index + 1}`).join(', ');
             const values = Object.values(data);
             

@@ -1296,32 +1296,77 @@ setTimeout(insertDefaultUserInputValues, 5000);
 for (const table of tables) {
     app.get(`/api/${table}`, async (req, res) => {
         try {
+            // 🚨 COMPREHENSIVE DEBUGGING FOR GALVANIZLI TEL
+            if (table.includes('gal_cost_cal')) {
+                console.log(`🚨🚨🚨 [${table}] ===== REQUEST START =====`);
+                console.log(`🚨 [${table}] Full req.query:`, JSON.stringify(req.query, null, 2));
+                console.log(`🚨 [${table}] Request URL:`, req.url);
+                console.log(`🚨 [${table}] Request method:`, req.method);
+                console.log(`🚨 [${table}] Headers:`, JSON.stringify(req.headers, null, 2));
+            }
+            
             // URL'den sorgu parametrelerini al
             const { id, mm_gt_id, ym_gt_id, ym_st_id, kod_2, cap, stok_kodu, stok_kodu_like, ids, status, created_by, request_id, hasir_tipi, boy_cap, en_cap, uzunluk_boy, uzunluk_en, goz_araligi, stok_adi_like, mamul_kodu, sort_by, sort_order, limit, page, offset } = req.query;
+            
+            // 🚨 COMPREHENSIVE DEBUGGING FOR GALVANIZLI TEL - Parameter extraction
+            if (table.includes('gal_cost_cal')) {
+                console.log(`🚨 [${table}] Extracted parameters:`);
+                console.log(`🚨 [${table}] - id:`, id);
+                console.log(`🚨 [${table}] - mm_gt_id:`, mm_gt_id);
+                console.log(`🚨 [${table}] - ym_gt_id:`, ym_gt_id);
+                console.log(`🚨 [${table}] - ym_st_id:`, ym_st_id);
+                console.log(`🚨 [${table}] - kod_2:`, kod_2);
+                console.log(`🚨 [${table}] - cap:`, cap);
+                console.log(`🚨 [${table}] - stok_kodu:`, stok_kodu);
+                console.log(`🚨 [${table}] - stok_kodu_like:`, stok_kodu_like);
+                console.log(`🚨 [${table}] - ids:`, ids);
+                console.log(`🚨 [${table}] - status:`, status);
+                console.log(`🚨 [${table}] - created_by:`, created_by);
+                console.log(`🚨 [${table}] - request_id:`, request_id);
+            }
             
             let query = `SELECT * FROM ${table}`;
             const queryParams = [];
             let whereConditions = [];
             
+            // 🚨 COMPREHENSIVE DEBUGGING FOR GALVANIZLI TEL - Initial state
+            if (table.includes('gal_cost_cal')) {
+                console.log(`🚨 [${table}] Initial query:`, query);
+                console.log(`🚨 [${table}] Initial queryParams:`, queryParams);
+                console.log(`🚨 [${table}] Initial whereConditions:`, whereConditions);
+            }
+            
             // Sorgu parametrelerine göre WHERE koşullarını oluştur
             if (id) {
                 whereConditions.push(`id = $${queryParams.length + 1}`);
                 queryParams.push(id);
+                if (table.includes('gal_cost_cal')) {
+                    console.log(`🚨 [${table}] Added ID condition - params count: ${queryParams.length}`);
+                }
             }
             
             if (mm_gt_id) {
                 whereConditions.push(`mm_gt_id = $${queryParams.length + 1}`);
                 queryParams.push(mm_gt_id);
+                if (table.includes('gal_cost_cal')) {
+                    console.log(`🚨 [${table}] Added mm_gt_id condition - params count: ${queryParams.length}`);
+                }
             }
             
             if (ym_gt_id) {
                 whereConditions.push(`ym_gt_id = $${queryParams.length + 1}`);
                 queryParams.push(ym_gt_id);
+                if (table.includes('gal_cost_cal')) {
+                    console.log(`🚨 [${table}] Added ym_gt_id condition - params count: ${queryParams.length}`);
+                }
             }
             
             if (ym_st_id) {
                 whereConditions.push(`ym_st_id = $${queryParams.length + 1}`);
                 queryParams.push(ym_st_id);
+                if (table.includes('gal_cost_cal')) {
+                    console.log(`🚨 [${table}] Added ym_st_id condition - params count: ${queryParams.length}`);
+                }
             }
             
             if (kod_2 && cap) {
@@ -1340,12 +1385,21 @@ for (const table of tables) {
             if (stok_kodu) {
                 whereConditions.push(`stok_kodu = $${queryParams.length + 1}`);
                 queryParams.push(stok_kodu);
+                if (table.includes('gal_cost_cal')) {
+                    console.log(`🚨 [${table}] Added stok_kodu condition - params count: ${queryParams.length}`);
+                    console.log(`🚨 [${table}] stok_kodu value:`, stok_kodu);
+                }
             }
             
             // Pattern arama için LIKE operatörü
             if (stok_kodu_like) {
                 whereConditions.push(`stok_kodu LIKE $${queryParams.length + 1}`);
                 queryParams.push(`${stok_kodu_like}%`);
+                if (table.includes('gal_cost_cal')) {
+                    console.log(`🚨 [${table}] Added stok_kodu_like condition - params count: ${queryParams.length}`);
+                    console.log(`🚨 [${table}] stok_kodu_like value:`, stok_kodu_like);
+                    console.log(`🚨 [${table}] stok_kodu_like with %:`, `${stok_kodu_like}%`);
+                }
             }
             
             // Çoklu ID araması için
@@ -1449,10 +1503,34 @@ for (const table of tables) {
                 
             }
             
+            // 🚨 COMPREHENSIVE DEBUGGING FOR GALVANIZLI TEL - Before WHERE clause construction
+            if (table.includes('gal_cost_cal')) {
+                console.log(`🚨🚨🚨 [${table}] ===== BEFORE WHERE CLAUSE CONSTRUCTION =====`);
+                console.log(`🚨 [${table}] Final whereConditions:`, whereConditions);
+                console.log(`🚨 [${table}] Final queryParams:`, queryParams);
+                console.log(`🚨 [${table}] whereConditions count: ${whereConditions.length}`);
+                console.log(`🚨 [${table}] queryParams count: ${queryParams.length}`);
+                
+                // Validate parameter count matches placeholders
+                const placeholderCount = whereConditions.join(' ').match(/\$\d+/g)?.length || 0;
+                console.log(`🚨 [${table}] Placeholder count in conditions: ${placeholderCount}`);
+                console.log(`🚨 [${table}] MISMATCH CHECK: placeholders(${placeholderCount}) vs params(${queryParams.length})`);
+                
+                if (placeholderCount !== queryParams.length) {
+                    console.log(`🚨🚨🚨 [${table}] ❌ CRITICAL PARAMETER MISMATCH DETECTED! ❌`);
+                    console.log(`🚨 [${table}] Each condition:`, whereConditions.map((cond, i) => `${i}: ${cond}`));
+                    console.log(`🚨 [${table}] Each param:`, queryParams.map((param, i) => `${i}: ${param}`));
+                }
+            }
             
             // WHERE koşullarını ekle
             if (whereConditions.length > 0) {
                 query += ` WHERE ${whereConditions.join(' AND ')}`;
+            }
+            
+            // 🚨 COMPREHENSIVE DEBUGGING FOR GALVANIZLI TEL - After WHERE clause construction
+            if (table.includes('gal_cost_cal')) {
+                console.log(`🚨 [${table}] Final query after WHERE:`, query);
             }
             
             // DEBUG: Log final query and parameters for galvanizli tel tables
@@ -1549,6 +1627,24 @@ for (const table of tables) {
                 client.release();
             }
         } catch (error) {
+            // 🚨 COMPREHENSIVE DEBUGGING FOR GALVANIZLI TEL - Error handling
+            if (table.includes('gal_cost_cal')) {
+                console.log(`🚨🚨🚨 [${table}] ===== ERROR OCCURRED =====`);
+                console.log(`🚨 [${table}] Error object:`, JSON.stringify(error, null, 2));
+                console.log(`🚨 [${table}] Error code:`, error.code);
+                console.log(`🚨 [${table}] Error message:`, error.message);
+                console.log(`🚨 [${table}] Error stack:`, error.stack);
+                console.log(`🚨 [${table}] Original req.query:`, JSON.stringify(req.query, null, 2));
+                console.log(`🚨 [${table}] Query that failed:`, query || 'Query not constructed');
+                console.log(`🚨 [${table}] Parameters that failed:`, queryParams || []);
+                console.log(`🚨 [${table}] WHERE conditions that failed:`, whereConditions || []);
+                
+                if (error.code === '42P02') {
+                    console.log(`🚨🚨🚨 [${table}] ❌ 42P02 PARAMETER ERROR DETECTED! ❌`);
+                    console.log(`🚨 [${table}] This means PostgreSQL expected parameter but didn't find it`);
+                    console.log(`🚨 [${table}] Query probably has placeholders like $1, $2 but missing corresponding values`);
+                }
+            }
             
             console.error(`${table} tablosundan veri getirme hatası:`, error);
             

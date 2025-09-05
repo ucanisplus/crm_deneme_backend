@@ -1289,8 +1289,34 @@ async function insertDefaultUserInputValues() {
   }
 }
 
-// Tablolar oluşturulduktan sonra varsayılan değerleri ekle
+// Create critical indexes for performance
+async function createGalvanizliTelIndexes() {
+    try {
+        console.log('🔧 Creating indexes for galvanizli tel tables...');
+        
+        // Critical indexes for stok_kodu lookups
+        const indexes = [
+            'CREATE INDEX IF NOT EXISTS idx_gal_mm_gt_stok_kodu ON gal_cost_cal_mm_gt(stok_kodu)',
+            'CREATE INDEX IF NOT EXISTS idx_gal_ym_gt_stok_kodu ON gal_cost_cal_ym_gt(stok_kodu)', 
+            'CREATE INDEX IF NOT EXISTS idx_gal_ym_st_stok_kodu ON gal_cost_cal_ym_st(stok_kodu)',
+            'CREATE INDEX IF NOT EXISTS idx_gal_mm_gt_stok_kodu_pattern ON gal_cost_cal_mm_gt(stok_kodu text_pattern_ops)',
+            'CREATE INDEX IF NOT EXISTS idx_gal_ym_gt_stok_kodu_pattern ON gal_cost_cal_ym_gt(stok_kodu text_pattern_ops)',
+            'CREATE INDEX IF NOT EXISTS idx_gal_ym_st_stok_kodu_pattern ON gal_cost_cal_ym_st(stok_kodu text_pattern_ops)'
+        ];
+        
+        for (const indexQuery of indexes) {
+            await pool.query(indexQuery);
+        }
+        
+        console.log('✅ Galvanizli tel indexes created successfully');
+    } catch (error) {
+        console.error('❌ Error creating galvanizli tel indexes:', error);
+    }
+}
+
+// Tablolar oluşturulduktan sonra varsayılan değerleri ve indexleri ekle
 setTimeout(insertDefaultUserInputValues, 5000);
+setTimeout(createGalvanizliTelIndexes, 6000);
 
 // Veri Getirmek için Genel GET Rotası - İyileştirilmiş hata işleme ile
 for (const table of tables) {

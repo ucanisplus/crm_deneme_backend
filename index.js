@@ -1391,8 +1391,14 @@ for (const table of tables) {
                 }
             }
             
-            // Pattern arama için LIKE operatörü
+            // Pattern arama için LIKE operatörü - OPTIMIZED FOR SEQUENCE GENERATION
             if (stok_kodu_like) {
+                // For galvanizli tel sequence generation, optimize the query
+                if (table.includes('gal_cost_cal') && !id && !ids) {
+                    // Only select stok_kodu column for sequence generation to speed up query
+                    query = `SELECT stok_kodu FROM ${table}`;
+                    console.log(`🚨 [${table}] Optimized query for sequence generation:`, query);
+                }
                 whereConditions.push(`stok_kodu LIKE $${queryParams.length + 1}`);
                 queryParams.push(`${stok_kodu_like}%`);
                 if (table.includes('gal_cost_cal')) {
@@ -1576,14 +1582,23 @@ for (const table of tables) {
             const client = await pool.connect();
             
             try {
-                // Set statement timeout for this specific query
-                await client.query('SET statement_timeout = 60000'); // 60 seconds
+                // Set statement timeout for this specific query - OPTIMIZED FOR GALVANIZLI TEL
+                if (table.includes('gal_cost_cal')) {
+                    await client.query('SET statement_timeout = 8000'); // 8 seconds for Vercel
+                    console.log(`🚨 [${table}] Set 8-second timeout for Vercel compatibility`);
+                } else {
+                    await client.query('SET statement_timeout = 60000'); // 60 seconds for other tables
+                }
                 
                 // Check if we need to count total rows (for large datasets)
                 // Remove ORDER BY and LIMIT/OFFSET from count query
-                let countQuery = query.replace('SELECT *', 'SELECT COUNT(*) as total');
+                let countQuery = query.replace(/SELECT [^F]*FROM/, 'SELECT COUNT(*) as total FROM');
                 countQuery = countQuery.replace(/ORDER BY.*$/i, '');
                 countQuery = countQuery.replace(/LIMIT.*$/i, '');
+                
+                if (table.includes('gal_cost_cal')) {
+                    console.log(`🚨 [${table}] Count query:`, countQuery);
+                }
                 
                 // Use original queryParams without pagination params for count
                 const countParams = queryParams.slice(0, -2 * (pageSize ? 1 : 0));

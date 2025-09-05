@@ -1296,13 +1296,6 @@ setTimeout(insertDefaultUserInputValues, 5000);
 for (const table of tables) {
     app.get(`/api/${table}`, async (req, res) => {
         try {
-            // 🚨 ENHANCED DEBUGGING: Log all incoming requests for gal_cost_cal tables
-            if (table.includes('gal_cost_cal')) {
-                console.log(`🚨 [${table}] REQUEST START - Received query parameters:`, req.query);
-                console.log(`🚨 [${table}] Request URL:`, req.url);
-                console.log(`🚨 [${table}] Request method:`, req.method);
-            }
-            
             // URL'den sorgu parametrelerini al
             const { id, mm_gt_id, ym_gt_id, ym_st_id, kod_2, cap, stok_kodu, stok_kodu_like, ids, status, created_by, request_id, hasir_tipi, boy_cap, en_cap, uzunluk_boy, uzunluk_en, goz_araligi, stok_adi_like, mamul_kodu, sort_by, sort_order, limit, page, offset } = req.query;
             
@@ -1456,22 +1449,6 @@ for (const table of tables) {
                 
             }
             
-            // 🚨 ENHANCED DEBUGGING: Check WHERE conditions and params for all gal_cost_cal tables
-            if (table.includes('gal_cost_cal')) {
-                console.log(`🚨 [${table}] WHERE conditions before construction:`, whereConditions);
-                console.log(`🚨 [${table}] Query params before WHERE:`, queryParams);
-                console.log(`🚨 [${table}] Conditions count: ${whereConditions.length}, Params count: ${queryParams.length}`);
-                
-                // 🚨 CRITICAL FIX: Ensure parameter count matches placeholders
-                const paramPlaceholderCount = whereConditions.join(' ').match(/\$\d+/g)?.length || 0;
-                if (paramPlaceholderCount !== queryParams.length) {
-                    console.log(`🚨 [${table} CRITICAL] Parameter mismatch detected!`);
-                    console.log(`🚨 [${table} CRITICAL] Placeholders in conditions: ${paramPlaceholderCount}`);
-                    console.log(`🚨 [${table} CRITICAL] Actual parameters: ${queryParams.length}`);
-                    console.log(`🚨 [${table} CRITICAL] Conditions with placeholders:`, whereConditions);
-                    console.log(`🚨 [${table} CRITICAL] WHERE conditions joined:`, whereConditions.join(' AND '));
-                }
-            }
             
             // WHERE koşullarını ekle
             if (whereConditions.length > 0) {
@@ -1537,12 +1514,6 @@ for (const table of tables) {
                 
                 console.log(`📊 ${table} total rows: ${totalRows}`);
                 
-                // 🚨 ENHANCED DEBUGGING: Log query execution details for gal_cost_cal tables
-                if (table.includes('gal_cost_cal')) {
-                    console.log(`🚨 [${table}] Final query before execution:`, query);
-                    console.log(`🚨 [${table}] Query parameters before execution:`, queryParams);
-                    console.log(`🚨 [${table}] Params count before execution: ${queryParams.length}`);
-                }
                 
                 // Execute the main query
                 const result = await client.query(query, queryParams);
@@ -1578,15 +1549,6 @@ for (const table of tables) {
                 client.release();
             }
         } catch (error) {
-            // 🚨 ENHANCED DEBUGGING: Log errors for all gal_cost_cal tables
-            if (table.includes('gal_cost_cal')) {
-                console.log(`🚨 [${table} ERROR] Error in ${table}:`, error);
-                console.log(`🚨 [${table} ERROR] Error code:`, error.code);
-                console.log(`🚨 [${table} ERROR] Error message:`, error.message);
-                console.log(`🚨 [${table} ERROR] Query params that caused error:`, req.query);
-                console.log(`🚨 [${table} ERROR] Final query that failed:`, query || 'Query not built yet');
-                console.log(`🚨 [${table} ERROR] Parameters passed to query:`, queryParams || []);
-            }
             
             console.error(`${table} tablosundan veri getirme hatası:`, error);
             

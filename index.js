@@ -1393,8 +1393,9 @@ for (const table of tables) {
             
             // Pattern arama için LIKE operatörü - OPTIMIZED FOR SEQUENCE GENERATION
             if (stok_kodu_like) {
-                // For galvanizli tel sequence generation, optimize the query
-                if (table.includes('gal_cost_cal') && !id && !ids) {
+                // For galvanizli tel sequence generation, optimize the query (only for tables that have stok_kodu)
+                const tablesWithStokKodu = ['gal_cost_cal_mm_gt', 'gal_cost_cal_ym_gt', 'gal_cost_cal_ym_st'];
+                if (tablesWithStokKodu.includes(table) && !id && !ids) {
                     // Only select stok_kodu column for sequence generation to speed up query
                     query = `SELECT stok_kodu FROM ${table}`;
                     console.log(`🚨 [${table}] Optimized query for sequence generation:`, query);
@@ -1546,7 +1547,12 @@ for (const table of tables) {
                 console.log(`🔍 [${table}] Where conditions: [${whereConditions.join(', ')}]`);
             }
             
-            // Sıralama ekle
+            // PAGINATION SUPPORT - Only apply pagination when explicitly requested via limit parameter
+            const pageSize = parseInt(limit) || null; // No default limit
+            const pageNumber = parseInt(page) || 1;
+            const offsetValue = parseInt(offset) || ((pageNumber - 1) * (pageSize || 0));
+            
+            // Sıralama ekle (ORDER BY must come before LIMIT/OFFSET)
             if (sort_by && sort_order) {
                 // Validate sort_by to prevent SQL injection
                 const allowedSortColumns = ['id', 'stok_kodu', 'stok_adi', 'cap', 'created_at', 'hasir_tipi', 'kod_2'];
@@ -1560,11 +1566,6 @@ for (const table of tables) {
                 // Default ordering for celik_hasir tables
                 query += ' ORDER BY id';
             }
-            
-            // PAGINATION SUPPORT - Only apply pagination when explicitly requested via limit parameter
-            const pageSize = parseInt(limit) || null; // No default limit
-            const pageNumber = parseInt(page) || 1;
-            const offsetValue = parseInt(offset) || ((pageNumber - 1) * (pageSize || 0));
             
             // Add pagination only when explicitly requested - FIXED PARAMETER INDEXING
             if (pageSize && pageSize > 0) {

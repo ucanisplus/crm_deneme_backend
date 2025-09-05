@@ -1670,8 +1670,19 @@ for (const table of tables) {
                     console.log(`🚨 [${table}] Count query:`, countQuery);
                 }
                 
-                // Use original queryParams for count (no pagination params to remove since we're not paginating the count)
-                const countParams = queryParams;
+                // For count query, exclude pagination parameters (LIMIT/OFFSET)
+                // Count query should only use WHERE condition parameters, not pagination params
+                let countParams = queryParams;
+                if (pageSize && pageSize > 0) {
+                    // Remove the last 2 parameters (LIMIT and OFFSET values)
+                    countParams = queryParams.slice(0, -2);
+                }
+                
+                if (table.includes('gal_cost_cal')) {
+                    console.log(`🚨 [${table}] Count params (${countParams.length}):`, countParams);
+                    console.log(`🚨 [${table}] Original params (${queryParams.length}):`, queryParams);
+                }
+                
                 const countResult = await client.query(countQuery, countParams);
                 const totalRows = parseInt(countResult.rows[0].total);
                 

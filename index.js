@@ -1656,6 +1656,11 @@ for (const table of tables) {
                 if (table.includes('gal_cost_cal')) {
                     await client.query('SET statement_timeout = 8000'); // 8 seconds for Vercel
                     console.log(`🚨 [${table}] Set 8-second timeout for Vercel compatibility`);
+                    
+                    // Additional optimizations for large galvanizli tel tables
+                    await client.query('SET enable_seqscan = off'); // Force index usage
+                    await client.query('SET work_mem = "64MB"'); // Increase sort memory
+                    console.log(`🚨 [${table}] Applied performance optimizations`);
                 } else {
                     await client.query('SET statement_timeout = 60000'); // 60 seconds for other tables
                 }

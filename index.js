@@ -1318,6 +1318,49 @@ async function createGalvanizliTelIndexes() {
 setTimeout(insertDefaultUserInputValues, 5000);
 setTimeout(createGalvanizliTelIndexes, 6000);
 
+// DIAGNOSTIC ENDPOINT - Test galvanizli tel database connectivity
+app.get('/api/diagnostic/gal_test', async (req, res) => {
+    try {
+        console.log('🔍 DIAGNOSTIC: Testing galvanizli tel database connectivity...');
+        const startTime = Date.now();
+        
+        // Test 1: Simple count query
+        const countResult = await pool.query('SELECT COUNT(*) FROM gal_cost_cal_mm_gt');
+        const count = countResult.rows[0].count;
+        console.log(`🔍 DIAGNOSTIC: Found ${count} records in gal_cost_cal_mm_gt`);
+        
+        // Test 2: Simple select with limit
+        const selectResult = await pool.query('SELECT stok_kodu FROM gal_cost_cal_mm_gt LIMIT 1');
+        const sample = selectResult.rows[0]?.stok_kodu || 'No records';
+        console.log(`🔍 DIAGNOSTIC: Sample stok_kodu: ${sample}`);
+        
+        // Test 3: Exact match query (the failing one)
+        const exactResult = await pool.query('SELECT COUNT(*) FROM gal_cost_cal_mm_gt WHERE stok_kodu = $1', ['GT.NIT.0810.00']);
+        const exactCount = exactResult.rows[0].count;
+        console.log(`🔍 DIAGNOSTIC: Exact match count for GT.NIT.0810.00: ${exactCount}`);
+        
+        const endTime = Date.now();
+        const duration = endTime - startTime;
+        console.log(`🔍 DIAGNOSTIC: Total time: ${duration}ms`);
+        
+        res.json({
+            success: true,
+            totalRecords: count,
+            sampleStokKodu: sample,
+            exactMatchCount: exactCount,
+            durationMs: duration,
+            message: 'All database tests passed'
+        });
+    } catch (error) {
+        console.error('🔍 DIAGNOSTIC ERROR:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message,
+            code: error.code
+        });
+    }
+});
+
 // Veri Getirmek için Genel GET Rotası - İyileştirilmiş hata işleme ile
 for (const table of tables) {
     app.get(`/api/${table}`, async (req, res) => {

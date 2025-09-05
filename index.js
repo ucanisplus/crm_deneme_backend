@@ -92,12 +92,10 @@ app.use((req, res, next) => {
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
     ssl: { rejectUnauthorized: false },
-    // Performance optimizations for Vercel serverless
-    max: 3, // Reduce for serverless (was 20)
-    idleTimeoutMillis: 10000, // 10 seconds (was 30)
-    connectionTimeoutMillis: 5000, // 5 seconds (was 10)
-    statement_timeout: 9000, // 9 seconds for Vercel's 10-second limit
-    query_timeout: 9000 // 9 seconds
+    // Keep original connection pool settings that worked
+    max: 20,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 10000
 });
 
 // Redis Configuration for Caching
@@ -1353,10 +1351,6 @@ for (const table of tables) {
             
             // Pattern arama için LIKE operatörü
             if (stok_kodu_like) {
-                // Optimize LIKE queries for sequence checking - only need stok_kodu field
-                if (table.includes('gal_cost_cal') && !id && !ids) {
-                    query = `SELECT stok_kodu FROM ${table}`; // Only fetch stok_kodu for performance
-                }
                 whereConditions.push(`stok_kodu LIKE $${queryParams.length + 1}`);
                 queryParams.push(`${stok_kodu_like}%`);
             }

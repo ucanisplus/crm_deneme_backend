@@ -3470,6 +3470,118 @@ app.get('/api/health', async (req, res) => {
     }
 });
 
+// ===== GALVANIZLI TEL BULK ENDPOINTS FOR EXCEL GENERATION =====
+// These endpoints provide fast bulk access for Excel generation functionality
+// Similar to Çelik Hasır pattern but for Galvanizli Tel products
+
+// Bulk endpoint for all MM GT products
+app.get('/api/gal_cost_cal_mm_gt/bulk-all', async (req, res) => {
+  try {
+    console.log('📊 BULK: Fetching all MM GT products for Excel generation...');
+    
+    const result = await pool.query(`
+      SELECT * FROM gal_cost_cal_mm_gt 
+      ORDER BY id ASC
+    `);
+    
+    console.log(`✅ BULK: Found ${result.rows.length} MM GT products`);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('❌ BULK: MM GT fetch error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Bulk endpoint for all YM GT products
+app.get('/api/gal_cost_cal_ym_gt/bulk-all', async (req, res) => {
+  try {
+    console.log('📊 BULK: Fetching all YM GT products for Excel generation...');
+    
+    const result = await pool.query(`
+      SELECT * FROM gal_cost_cal_ym_gt 
+      ORDER BY id ASC
+    `);
+    
+    console.log(`✅ BULK: Found ${result.rows.length} YM GT products`);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('❌ BULK: YM GT fetch error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Bulk endpoint for all YM ST products
+app.get('/api/gal_cost_cal_ym_st/bulk-all', async (req, res) => {
+  try {
+    console.log('📊 BULK: Fetching all YM ST products for Excel generation...');
+    
+    const result = await pool.query(`
+      SELECT * FROM gal_cost_cal_ym_st 
+      ORDER BY id ASC
+    `);
+    
+    console.log(`✅ BULK: Found ${result.rows.length} YM ST products`);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('❌ BULK: YM ST fetch error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Bulk endpoint for all MM GT recipes
+app.get('/api/gal_cost_cal_mm_gt_recete/bulk-all', async (req, res) => {
+  try {
+    console.log('📊 BULK: Fetching all MM GT recipes for Excel generation...');
+    
+    const result = await pool.query(`
+      SELECT * FROM gal_cost_cal_mm_gt_recete 
+      ORDER BY mm_gt_id ASC
+    `);
+    
+    console.log(`✅ BULK: Found ${result.rows.length} MM GT recipes`);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('❌ BULK: MM GT recipe fetch error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Bulk endpoint for all YM GT recipes
+app.get('/api/gal_cost_cal_ym_gt_recete/bulk-all', async (req, res) => {
+  try {
+    console.log('📊 BULK: Fetching all YM GT recipes for Excel generation...');
+    
+    const result = await pool.query(`
+      SELECT * FROM gal_cost_cal_ym_gt_recete 
+      ORDER BY ym_gt_id ASC
+    `);
+    
+    console.log(`✅ BULK: Found ${result.rows.length} YM GT recipes`);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('❌ BULK: YM GT recipe fetch error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Bulk endpoint for all YM ST recipes
+app.get('/api/gal_cost_cal_ym_st_recete/bulk-all', async (req, res) => {
+  try {
+    console.log('📊 BULK: Fetching all YM ST recipes for Excel generation...');
+    
+    const result = await pool.query(`
+      SELECT * FROM gal_cost_cal_ym_st_recete 
+      ORDER BY ym_st_id ASC
+    `);
+    
+    console.log(`✅ BULK: Found ${result.rows.length} YM ST recipes`);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('❌ BULK: YM ST recipe fetch error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 const PORT = process.env.PORT || 4000;
 if (process.env.NODE_ENV !== 'production') {
     app.listen(PORT, () => {

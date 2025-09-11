@@ -28,5 +28,5 @@ COPY . .
 # Expose port
 EXPOSE 3000
 
-# Start the Render-specific application with APS endpoints
-CMD ["node", "index_render_aps.js"]
+# Start the Render-specific application with CelikHasir endpoints
+CMD ["node", "index_render_celik_hasir.js"]

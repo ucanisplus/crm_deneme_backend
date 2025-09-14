@@ -915,10 +915,18 @@ celikHasirTables.forEach(table => {
       let data = req.body;
       console.log(`📝 POST ${table}:`, data);
 
-      // Normalize numbers
+      // Normalize numbers - only for numeric fields, skip text fields
+      const numericFields = ['boy_cap', 'en_cap', 'uzunluk_boy', 'uzunluk_en', 'cubuk_sayisi_boy', 'cubuk_sayisi_en', 'goz_araligi', 'cap', 'cap2', 'boyCap', 'enCap', 'uzunlukBoy', 'uzunlukEn', 'cubukSayisiBoy', 'cubukSayisiEn', 'fiyat', 'agirlik', 'miktar', 'price', 'weight', 'quantity'];
+      const textFields = ['stok_adi', 'ingilizce_isim', 'mamul_kodu', 'hasir_tipi', 'description', 'name', 'title'];
+      
       const normalizedData = {};
       for (const [key, value] of Object.entries(data)) {
-        if (typeof value === 'string' && value.includes(',')) {
+        if (textFields.includes(key)) {
+          // Never normalize text fields, even if they contain commas
+          console.log(`🔒 Preserving text field ${key}: ${value}`);
+          normalizedData[key] = value;
+        } else if (numericFields.includes(key) && typeof value === 'string' && value.includes(',')) {
+          console.log(`🔢 Normalizing numeric field ${key}: ${value} -> ${normalizeNumber(value)}`);
           normalizedData[key] = normalizeNumber(value);
         } else {
           normalizedData[key] = value;
@@ -975,10 +983,18 @@ celikHasirTables.forEach(table => {
       
       console.log(`🔄 PUT ${table}/${id}:`, data);
 
-      // Normalize numbers
+      // Normalize numbers - only for numeric fields, skip text fields
+      const numericFields = ['boy_cap', 'en_cap', 'uzunluk_boy', 'uzunluk_en', 'cubuk_sayisi_boy', 'cubuk_sayisi_en', 'goz_araligi', 'cap', 'cap2', 'boyCap', 'enCap', 'uzunlukBoy', 'uzunlukEn', 'cubukSayisiBoy', 'cubukSayisiEn', 'fiyat', 'agirlik', 'miktar', 'price', 'weight', 'quantity'];
+      const textFields = ['stok_adi', 'ingilizce_isim', 'mamul_kodu', 'hasir_tipi', 'description', 'name', 'title'];
+      
       const normalizedData = {};
       for (const [key, value] of Object.entries(data)) {
-        if (typeof value === 'string' && value.includes(',')) {
+        if (textFields.includes(key)) {
+          // Never normalize text fields, even if they contain commas
+          console.log(`🔒 Preserving text field ${key}: ${value}`);
+          normalizedData[key] = value;
+        } else if (numericFields.includes(key) && typeof value === 'string' && value.includes(',')) {
+          console.log(`🔢 Normalizing numeric field ${key}: ${value} -> ${normalizeNumber(value)}`);
           normalizedData[key] = normalizeNumber(value);
         } else {
           normalizedData[key] = value;

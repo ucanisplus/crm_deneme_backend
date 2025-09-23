@@ -3582,6 +3582,383 @@ app.get('/api/gal_cost_cal_ym_st_recete/bulk-all', async (req, res) => {
   }
 });
 
+// =====================================================
+// PRODUCTION PLANNING ENDPOINTS (Steel Mesh)
+// =====================================================
+
+// Add multer for file uploads
+const multer = require('multer');
+const XLSX = require('xlsx');
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB limit
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.includes('spreadsheet') || file.mimetype.includes('excel') || file.originalname.endsWith('.xlsx') || file.originalname.endsWith('.csv')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only Excel and CSV files are allowed'), false);
+    }
+  }
+});
+
+// Create new production planning session
+app.post('/api/celik-hasir-planlama/sessions', async (req, res) => {
+  try {
+    const { name, description, max_schedule_days = 30, include_stock_products = true } = req.body;
+
+    const result = await pool.query(`
+      INSERT INTO celik_hasir_planlama_sessions (name, description, max_schedule_days, include_stock_products)
+      VALUES ($1, $2, $3, $4) RETURNING *
+    `, [name, description, max_schedule_days, include_stock_products]);
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('❌ Session creation error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get all sessions
+app.get('/api/celik-hasir-planlama/sessions', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT * FROM celik_hasir_planlama_sessions
+      ORDER BY created_at DESC
+    `);
+
+    res.json(result.rows);
+  } catch (error) {
+    console.error('❌ Sessions fetch error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Excel/CSV upload and processing
+app.post('/api/celik-hasir-planlama/upload/:sessionId', upload.single('file'), async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    // Parse Excel/CSV file
+    const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
+    const sheetName = workbook.SheetNames[0];
+    const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1, defval: '' });
+
+    // Simple column mapping for Turkish headers
+    const products = [];
+
+    for (let i = 3; i < jsonData.length; i++) {
+      const row = jsonData[i];
+      if (!row || row.length < 10) continue;
+
+      try {
+        const product = {
+          session_id: parseInt(sessionId),
+          siparis_tarihi: row[0] || null,
+          firma: row[1] || '',
+          stok_kodu: row[2] || '',
+          hasir_cinsi: row[3] || '',
+          boy: parseInt(row[4]) || 500,
+          en: parseInt(row[5]) || 215,
+          boy_cap: parseFloat(row[6]) || 0,
+          en_cap: parseFloat(row[7]) || 0,
+          en_ara: parseFloat(row[9]) || 15,
+          birim_agirlik: parseFloat(row[14]) || 0,
+          uretim_kalan: parseInt(row[18]) || 0,
+          kalan_kg: parseFloat(row[19]) || 0,
+          primary_diameter: Math.max(parseFloat(row[6]) || 0, parseFloat(row[7]) || 0),
+          mesh_type: (row[3] || '').toString().includes('Q') ? 'Q' :
+                    (row[3] || '').toString().includes('R') ? 'R' :
+                    (row[3] || '').toString().includes('TR') ? 'TR' : 'S',
+          total_tonnage: ((parseFloat(row[14]) || 0) * (parseInt(row[18]) || 0)) / 1000,
+          is_filler_product: !row[1] || row[1].toString().trim() === '',
+          is_regular_product: (parseInt(row[18]) || 0) > 0
+        };
+
+        // Basic validation
+        if (product.stok_kodu && product.primary_diameter > 0) {
+          products.push(product);
+        }
+      } catch (error) {
+        console.warn('Row parsing error:', error);
+      }
+    }
+
+    // Bulk insert simplified
+    if (products.length > 0) {
+      const values = products.map(p => [
+        p.session_id, p.siparis_tarihi, p.firma, p.stok_kodu, p.hasir_cinsi,
+        p.boy, p.en, p.boy_cap, p.en_cap, p.en_ara,
+        p.birim_agirlik, p.uretim_kalan, p.kalan_kg, p.primary_diameter,
+        p.mesh_type, p.total_tonnage, p.is_filler_product, p.is_regular_product
+      ]);
+
+      const placeholders = values.map((_, i) =>
+        `($${i * 18 + 1}, $${i * 18 + 2}, $${i * 18 + 3}, $${i * 18 + 4}, $${i * 18 + 5}, $${i * 18 + 6}, $${i * 18 + 7}, $${i * 18 + 8}, $${i * 18 + 9}, $${i * 18 + 10}, $${i * 18 + 11}, $${i * 18 + 12}, $${i * 18 + 13}, $${i * 18 + 14}, $${i * 18 + 15}, $${i * 18 + 16}, $${i * 18 + 17}, $${i * 18 + 18})`
+      ).join(', ');
+
+      await pool.query(`
+        INSERT INTO celik_hasir_planlama_production_orders (
+          session_id, siparis_tarihi, firma, stok_kodu, hasir_cinsi,
+          boy, en, boy_cap, en_cap, en_ara,
+          birim_agirlik, uretim_kalan, kalan_kg, primary_diameter,
+          mesh_type, total_tonnage, is_filler_product, is_regular_product
+        ) VALUES ${placeholders}
+      `, values.flat());
+    }
+
+    res.json({
+      message: 'File processed successfully',
+      products_imported: products.length,
+      filler_products: products.filter(p => p.is_filler_product).length
+    });
+
+  } catch (error) {
+    console.error('❌ Excel upload error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Simple scheduling endpoint
+app.post('/api/celik-hasir-planlama/schedule/:sessionId', async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+
+    // Get orders for this session
+    const ordersResult = await pool.query(`
+      SELECT * FROM celik_hasir_planlama_production_orders
+      WHERE session_id = $1 AND is_regular_product = true
+      ORDER BY total_tonnage DESC
+    `, [sessionId]);
+
+    const orders = ordersResult.rows;
+    if (orders.length === 0) {
+      return res.json({ message: 'No orders to schedule' });
+    }
+
+    // Simple machine assignment
+    const machines = ['MG316', 'MG208-1', 'MG208-2', 'EUROBEND'];
+    let currentMachine = 0;
+
+    const schedules = orders.map((order, index) => ({
+      session_id: parseInt(sessionId),
+      production_order_id: order.id,
+      assigned_machine_id: machines[currentMachine],
+      sequence_number: Math.floor(index / machines.length) + 1,
+      day_number: Math.floor(index / (machines.length * 10)) + 1,
+      production_time_minutes: Math.max(60, order.total_tonnage * 10),
+      status: 'scheduled'
+    }));
+
+    // Cycle through machines
+    currentMachine = (currentMachine + 1) % machines.length;
+
+    // Insert schedules
+    for (const schedule of schedules) {
+      await pool.query(`
+        INSERT INTO celik_hasir_planlama_production_schedules (
+          session_id, production_order_id, assigned_machine_id, sequence_number,
+          day_number, production_time_minutes, status
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `, [
+        schedule.session_id, schedule.production_order_id, schedule.assigned_machine_id,
+        schedule.sequence_number, schedule.day_number, schedule.production_time_minutes,
+        schedule.status
+      ]);
+    }
+
+    res.json({
+      message: 'Scheduling completed',
+      orders_scheduled: schedules.length,
+      machines_used: machines.length
+    });
+
+  } catch (error) {
+    console.error('❌ Scheduling error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get production schedules
+app.get('/api/celik-hasir-planlama/schedules/:sessionId', async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+
+    const result = await pool.query(`
+      SELECT
+        ps.*,
+        po.firma,
+        po.stok_kodu,
+        po.hasir_cinsi,
+        po.total_tonnage
+      FROM celik_hasir_planlama_production_schedules ps
+      JOIN celik_hasir_planlama_production_orders po ON ps.production_order_id = po.id
+      WHERE ps.session_id = $1
+      ORDER BY ps.assigned_machine_id, ps.sequence_number
+    `, [sessionId]);
+
+    res.json(result.rows);
+  } catch (error) {
+    console.error('❌ Schedules fetch error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get session details
+app.get('/api/celik-hasir-planlama/sessions/:sessionId', async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+
+    const result = await pool.query(`
+      SELECT s.*,
+             COUNT(po.id) as total_products,
+             COUNT(CASE WHEN po.is_filler_product = false THEN 1 END) as regular_products,
+             COUNT(CASE WHEN po.is_filler_product = true THEN 1 END) as filler_products,
+             COALESCE(SUM(po.total_tonnage), 0) as total_tonnage
+      FROM celik_hasir_planlama_sessions s
+      LEFT JOIN celik_hasir_planlama_production_orders po ON s.id = po.session_id
+      WHERE s.id = $1
+      GROUP BY s.id
+    `, [sessionId]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('❌ Session details error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Delete session
+app.delete('/api/celik-hasir-planlama/sessions/:sessionId', async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+
+    // Delete session (cascading will remove related data)
+    await pool.query('DELETE FROM celik_hasir_planlama_sessions WHERE id = $1', [sessionId]);
+
+    res.json({ message: 'Session deleted successfully' });
+  } catch (error) {
+    console.error('❌ Session deletion error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get production orders for a session
+app.get('/api/celik-hasir-planlama/orders/:sessionId', async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+
+    const result = await pool.query(`
+      SELECT * FROM celik_hasir_planlama_production_orders
+      WHERE session_id = $1
+      ORDER BY is_filler_product ASC, total_tonnage DESC
+    `, [sessionId]);
+
+    res.json(result.rows);
+  } catch (error) {
+    console.error('❌ Orders fetch error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Drag & drop reorder schedules
+app.put('/api/celik-hasir-planlama/schedules/reorder', async (req, res) => {
+  try {
+    const { scheduleId, newMachineId, newSequence, newDay } = req.body;
+
+    await pool.query(`
+      UPDATE celik_hasir_planlama_production_schedules
+      SET assigned_machine_id = $1, sequence_number = $2, day_number = $3, is_manually_adjusted = true
+      WHERE id = $4
+    `, [newMachineId, newSequence, newDay, scheduleId]);
+
+    res.json({ message: 'Schedule updated successfully' });
+  } catch (error) {
+    console.error('❌ Drag & drop error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Analytics endpoint
+app.get('/api/celik-hasir-planlama/analytics/:sessionId', async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+
+    // Get basic analytics
+    const summaryResult = await pool.query(`
+      SELECT
+        COUNT(*) as total_orders,
+        COUNT(DISTINCT po.firma) as unique_customers,
+        SUM(po.total_tonnage) as total_weight,
+        COUNT(CASE WHEN po.is_filler_product = true THEN 1 END) as filler_count
+      FROM celik_hasir_planlama_production_orders po
+      WHERE po.session_id = $1
+    `, [sessionId]);
+
+    // Get machine utilization
+    const machineResult = await pool.query(`
+      SELECT
+        ps.assigned_machine_id,
+        COUNT(*) as total_products,
+        SUM(ps.production_time_minutes) as used_time_minutes,
+        ROUND(AVG(ps.production_time_minutes)) as avg_production_time
+      FROM celik_hasir_planlama_production_schedules ps
+      WHERE ps.session_id = $1
+      GROUP BY ps.assigned_machine_id
+    `, [sessionId]);
+
+    const analytics = {
+      summary: summaryResult.rows[0],
+      machines: machineResult.rows,
+      tir_capacity: 26 // tons
+    };
+
+    res.json(analytics);
+  } catch (error) {
+    console.error('❌ Analytics error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Export schedules
+app.get('/api/celik-hasir-planlama/export/:sessionId', async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+
+    const result = await pool.query(`
+      SELECT
+        ps.sequence_number as "Sıra",
+        po.firma as "Müşteri",
+        po.stok_kodu as "Stok Kodu",
+        po.hasir_cinsi as "Hasır Cinsi",
+        po.boy as "Boy",
+        po.en as "En",
+        po.primary_diameter as "Çap",
+        po.total_tonnage as "Tonaj",
+        ps.assigned_machine_id as "Makine",
+        ps.day_number as "Gün",
+        ps.production_time_minutes as "Üretim Süresi (dk)"
+      FROM celik_hasir_planlama_production_schedules ps
+      JOIN celik_hasir_planlama_production_orders po ON ps.production_order_id = po.id
+      WHERE ps.session_id = $1
+      ORDER BY ps.assigned_machine_id, ps.sequence_number
+    `, [sessionId]);
+
+    res.json(result.rows);
+  } catch (error) {
+    console.error('❌ Export error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 const PORT = process.env.PORT || 4000;
 if (process.env.NODE_ENV !== 'production') {
     app.listen(PORT, () => {

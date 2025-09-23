@@ -3608,9 +3608,9 @@ app.post('/api/celik-hasir-planlama/sessions', async (req, res) => {
     const { name, description, max_schedule_days = 30, include_stock_products = true } = req.body;
 
     const result = await pool.query(`
-      INSERT INTO celik_hasir_planlama_sessions (name, description, max_schedule_days, include_stock_products)
+      INSERT INTO celik_hasir_planlama_sessions (session_name, upload_filename, max_schedule_days, include_stock_products)
       VALUES ($1, $2, $3, $4) RETURNING *
-    `, [name, description, max_schedule_days, include_stock_products]);
+    `, [name, description || name, max_schedule_days, include_stock_products]);
 
     res.json(result.rows[0]);
   } catch (error) {
@@ -3634,13 +3634,17 @@ app.get('/api/celik-hasir-planlama/sessions', async (req, res) => {
   }
 });
 
-// Excel/CSV upload and processing
-app.post('/api/celik-hasir-planlama/upload/:sessionId', upload.single('file'), async (req, res) => {
+// Excel/CSV upload and processing with column mapping support
+app.post('/api/celik-hasir-planlama/upload', upload.single('file'), async (req, res) => {
   try {
-    const { sessionId } = req.params;
+    const { session_id, header_row_index = '0', column_mappings } = req.body;
 
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    if (!session_id) {
+      return res.status(400).json({ error: 'session_id is required' });
     }
 
     // Parse Excel/CSV file
@@ -3648,52 +3652,105 @@ app.post('/api/celik-hasir-planlama/upload/:sessionId', upload.single('file'), a
     const sheetName = workbook.SheetNames[0];
     const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1, defval: '' });
 
-    // Simple column mapping for Turkish headers
+    if (jsonData.length < 2) {
+      return res.status(400).json({ error: 'File does not contain enough data' });
+    }
+
+    // Get header row
+    const headerRowIdx = parseInt(header_row_index) || 0;
+    const headers = jsonData[headerRowIdx];
+    const dataRows = jsonData.slice(headerRowIdx + 1);
+
+    // Parse column mappings if provided
+    let mappings = {};
+    if (column_mappings) {
+      try {
+        mappings = JSON.parse(column_mappings);
+      } catch (e) {
+        console.warn('Invalid column_mappings JSON:', e);
+      }
+    }
+
+    // Create column index mapping
+    const getColumnIndex = (expectedColumn) => {
+      // First try reverse mapping from user input (user maps Excel column -> System column)
+      for (const [excelCol, systemCol] of Object.entries(mappings)) {
+        if (systemCol === expectedColumn) {
+          return headers.indexOf(excelCol);
+        }
+      }
+
+      // Then try finding the expected column directly
+      const directIndex = headers.indexOf(expectedColumn);
+      if (directIndex !== -1) return directIndex;
+
+      // Finally try partial matching
+      const lowerExpected = expectedColumn.toLowerCase();
+      return headers.findIndex(h =>
+        h && (h.toLowerCase().includes(lowerExpected) ||
+        lowerExpected.includes(h.toLowerCase()))
+      );
+    };
+
     const products = [];
 
-    for (let i = 3; i < jsonData.length; i++) {
-      const row = jsonData[i];
-      if (!row || row.length < 10) continue;
+    for (let i = 0; i < dataRows.length; i++) {
+      const row = dataRows[i];
+      if (!row || row.length === 0) continue;
 
       try {
+        // Map columns based on expected structure
+        const siparisTarihiIdx = getColumnIndex('S. Tarihi');
+        const firmaIdx = getColumnIndex('Firma');
+        const stokKoduIdx = getColumnIndex('Stok Kartı');
+        const hasirTipiIdx = getColumnIndex('Hasır Tipi');
+        const boyIdx = getColumnIndex('Boy');
+        const enIdx = getColumnIndex('En');
+        const capIdx = getColumnIndex('Çap');
+        const agirlikIdx = getColumnIndex('Ağırlık (KG)');
+        const miktarIdx = getColumnIndex('Miktar');
+        const kalanIdx = getColumnIndex('Ü. Kalan');
+
         const product = {
-          session_id: parseInt(sessionId),
-          siparis_tarihi: row[0] || null,
-          firma: row[1] || '',
-          stok_kodu: row[2] || '',
-          hasir_cinsi: row[3] || '',
-          boy: parseInt(row[4]) || 500,
-          en: parseInt(row[5]) || 215,
-          boy_cap: parseFloat(row[6]) || 0,
-          en_cap: parseFloat(row[7]) || 0,
-          en_ara: parseFloat(row[9]) || 15,
-          birim_agirlik: parseFloat(row[14]) || 0,
-          uretim_kalan: parseInt(row[18]) || 0,
-          kalan_kg: parseFloat(row[19]) || 0,
-          primary_diameter: Math.max(parseFloat(row[6]) || 0, parseFloat(row[7]) || 0),
-          mesh_type: (row[3] || '').toString().includes('Q') ? 'Q' :
-                    (row[3] || '').toString().includes('R') ? 'R' :
-                    (row[3] || '').toString().includes('TR') ? 'TR' : 'S',
-          total_tonnage: ((parseFloat(row[14]) || 0) * (parseInt(row[18]) || 0)) / 1000,
-          is_filler_product: !row[1] || row[1].toString().trim() === '',
-          is_regular_product: (parseInt(row[18]) || 0) > 0
+          session_id: parseInt(session_id),
+          siparis_tarihi: siparisTarihiIdx >= 0 ? row[siparisTarihiIdx] : null,
+          firma: firmaIdx >= 0 ? (row[firmaIdx] || '') : '',
+          stok_kodu: stokKoduIdx >= 0 ? (row[stokKoduIdx] || '') : '',
+          hasir_cinsi: hasirTipiIdx >= 0 ? (row[hasirTipiIdx] || '') : '',
+          boy: boyIdx >= 0 ? (parseInt(row[boyIdx]) || 500) : 500,
+          en: enIdx >= 0 ? (parseInt(row[enIdx]) || 215) : 215,
+          en_cap: capIdx >= 0 ? (parseFloat(row[capIdx]) || 4.5) : 4.5,
+          boy_cap: capIdx >= 0 ? (parseFloat(row[capIdx]) || 4.5) : 4.5,
+          en_ara: 15.0, // Default spacing
+          birim_agirlik: agirlikIdx >= 0 ? (parseFloat(row[agirlikIdx]) || 0) : 0,
+          siparis_miktari: miktarIdx >= 0 ? (parseInt(row[miktarIdx]) || 0) : 0,
+          uretim_kalan: kalanIdx >= 0 ? (parseInt(row[kalanIdx]) || 0) : 0
         };
+
+        // Calculate derived fields
+        product.primary_diameter = Math.max(product.boy_cap, product.en_cap);
+        product.mesh_type = product.hasir_cinsi.includes('Q') ? 'Q' :
+                           product.hasir_cinsi.includes('R') ? 'R' :
+                           product.hasir_cinsi.includes('TR') ? 'TR' : 'S';
+        product.total_tonnage = (product.birim_agirlik * product.uretim_kalan) / 1000;
+        product.is_filler_product = !product.firma || product.firma.trim() === '' || product.uretim_kalan === 0;
+        product.is_regular_product = product.uretim_kalan > 0;
 
         // Basic validation
         if (product.stok_kodu && product.primary_diameter > 0) {
           products.push(product);
         }
       } catch (error) {
-        console.warn('Row parsing error:', error);
+        console.warn(`Row ${i + headerRowIdx + 2} parsing error:`, error);
       }
     }
 
-    // Bulk insert simplified
+    // Bulk insert products
     if (products.length > 0) {
       const values = products.map(p => [
         p.session_id, p.siparis_tarihi, p.firma, p.stok_kodu, p.hasir_cinsi,
         p.boy, p.en, p.boy_cap, p.en_cap, p.en_ara,
-        p.birim_agirlik, p.uretim_kalan, p.kalan_kg, p.primary_diameter,
+        p.birim_agirlik, p.siparis_miktari, p.uretim_kalan, p.primary_diameter,
         p.mesh_type, p.total_tonnage, p.is_filler_product, p.is_regular_product
       ]);
 
@@ -3705,7 +3762,7 @@ app.post('/api/celik-hasir-planlama/upload/:sessionId', upload.single('file'), a
         INSERT INTO celik_hasir_planlama_production_orders (
           session_id, siparis_tarihi, firma, stok_kodu, hasir_cinsi,
           boy, en, boy_cap, en_cap, en_ara,
-          birim_agirlik, uretim_kalan, kalan_kg, primary_diameter,
+          birim_agirlik, siparis_miktari, uretim_kalan, primary_diameter,
           mesh_type, total_tonnage, is_filler_product, is_regular_product
         ) VALUES ${placeholders}
       `, values.flat());
@@ -3713,8 +3770,12 @@ app.post('/api/celik-hasir-planlama/upload/:sessionId', upload.single('file'), a
 
     res.json({
       message: 'File processed successfully',
-      products_imported: products.length,
-      filler_products: products.filter(p => p.is_filler_product).length
+      total_products: products.length,
+      regular_products: products.filter(p => p.is_regular_product).length,
+      filler_products: products.filter(p => p.is_filler_product).length,
+      headers_detected: headers,
+      header_row_index: headerRowIdx,
+      column_mappings: mappings
     });
 
   } catch (error) {

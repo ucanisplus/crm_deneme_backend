@@ -3634,10 +3634,145 @@ app.get('/api/celik-hasir-planlama/sessions', async (req, res) => {
   }
 });
 
-// Excel/CSV upload and processing with column mapping support
+// Get stock product specifications from celik_hasir_netsis_mm table
+app.get('/api/celik-hasir-planlama/stock/:stokKodu', async (req, res) => {
+  try {
+    const { stokKodu } = req.params;
+
+    const result = await pool.query(`
+      SELECT
+        stok_kodu,
+        stok_adi,
+        hasir_tipi,
+        cap,
+        cap2,
+        ebat_boy,
+        ebat_en,
+        goz_araligi,
+        kg as birim_agirlik,
+        cubuk_sayisi_boy,
+        cubuk_sayisi_en,
+        dis_cap_en_cubuk_ad
+      FROM celik_hasir_netsis_mm
+      WHERE stok_kodu = $1
+      LIMIT 1
+    `, [stokKodu]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Product not found in stock database' });
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('❌ Stock lookup error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Excel/CSV upload and processing with enhanced data integration
 app.post('/api/celik-hasir-planlama/upload', upload.single('file'), async (req, res) => {
   try {
-    const { session_id, header_row_index = '0', column_mappings } = req.body;
+    const { session_id, orders, total_orders } = req.body;
+
+    // Handle direct JSON data upload (from new simplified upload module)
+    if (orders && Array.isArray(orders)) {
+      // Process orders with stock table integration
+      const enrichedOrders = [];
+
+      for (const order of orders) {
+        try {
+          // Get product specs from stock table
+          const stockResult = await pool.query(`
+            SELECT
+              stok_kodu,
+              stok_adi,
+              hasir_tipi,
+              cap,
+              cap2,
+              ebat_boy,
+              ebat_en,
+              goz_araligi,
+              kg as stock_birim_agirlik,
+              cubuk_sayisi_boy,
+              cubuk_sayisi_en,
+              dis_cap_en_cubuk_ad
+            FROM celik_hasir_netsis_mm
+            WHERE stok_kodu = $1
+            LIMIT 1
+          `, [order.stok_kodu]);
+
+          const stockData = stockResult.rows[0];
+
+          // Enrich order with stock data
+          const enrichedOrder = {
+            ...order,
+            // Use stock data if available, fallback to CSV data
+            boy: stockData ? parseInt(stockData.ebat_boy) : order.boy,
+            en: stockData ? parseInt(stockData.ebat_en) : order.en,
+            boy_cap: stockData ? parseFloat(stockData.cap) : order.boy_cap,
+            en_cap: stockData ? parseFloat(stockData.cap2 || stockData.cap) : order.en_cap,
+            goz_araligi: stockData ? stockData.goz_araligi : `${order.boy_ara}x${order.en_ara}`,
+            cubuk_sayisi_boy: stockData ? parseInt(stockData.cubuk_sayisi_boy) : null,
+            cubuk_sayisi_en: stockData ? parseInt(stockData.cubuk_sayisi_en) : null,
+            dis_cap_en_cubuk_ad: stockData ? parseInt(stockData.dis_cap_en_cubuk_ad) : null,
+            // Use CSV weight if available, otherwise stock weight
+            birim_agirlik: order.birim_agirlik || (stockData ? parseFloat(stockData.stock_birim_agirlik) : 0),
+            has_stock_data: !!stockData
+          };
+
+          enrichedOrders.push(enrichedOrder);
+        } catch (error) {
+          console.warn(`Stock lookup failed for ${order.stok_kodu}:`, error.message);
+          // Add order without stock enrichment
+          enrichedOrders.push({ ...order, has_stock_data: false });
+        }
+      }
+
+      // Insert enriched orders into database
+      if (enrichedOrders.length > 0) {
+        // Delete existing orders for this session
+        await pool.query('DELETE FROM celik_hasir_planlama_production_orders WHERE session_id = $1', [session_id]);
+
+        // Insert new orders
+        for (const order of enrichedOrders) {
+          await pool.query(`
+            INSERT INTO celik_hasir_planlama_production_orders (
+              session_id, siparis_tarihi, firma, stok_kodu, hasir_cinsi,
+              boy, en, boy_cap, en_cap, boy_ara, en_ara,
+              filiz_on, filiz_arka, filiz_sag, filiz_sol,
+              birim_agirlik, siparis_miktari, stok_adet, stok_kg,
+              uretim_kalan, kalan_kg, primary_diameter, secondary_diameter,
+              mesh_type, total_tonnage, is_stock_customer, is_filler_product,
+              is_regular_product, cubuk_sayisi_boy, cubuk_sayisi_en,
+              dis_cap_en_cubuk_ad, has_stock_data
+            ) VALUES (
+              $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15,
+              $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28,
+              $29, $30, $31, $32
+            )
+          `, [
+            session_id, order.siparis_tarihi, order.firma, order.stok_kodu, order.hasir_cinsi,
+            order.boy, order.en, order.boy_cap, order.en_cap, order.boy_ara, order.en_ara,
+            order.filiz_on, order.filiz_arka, order.filiz_sag, order.filiz_sol,
+            order.birim_agirlik, order.siparis_miktari, order.stok_adet, order.stok_kg,
+            order.uretim_kalan, order.kalan_kg, order.primary_diameter, order.secondary_diameter,
+            order.mesh_type, order.total_tonnage, order.is_stock_customer, order.is_filler_product,
+            order.is_regular_product, order.cubuk_sayisi_boy, order.cubuk_sayisi_en,
+            order.dis_cap_en_cubuk_ad, order.has_stock_data
+          ]);
+        }
+      }
+
+      return res.json({
+        message: 'Orders processed successfully',
+        total_orders: enrichedOrders.length,
+        orders_with_stock_data: enrichedOrders.filter(o => o.has_stock_data).length,
+        orders_without_stock_data: enrichedOrders.filter(o => !o.has_stock_data).length
+      });
+    }
+
+    // Legacy file upload handling (kept for backward compatibility)
+    const { header_row_index = '0', column_mappings } = req.body;
 
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });
@@ -3784,7 +3919,7 @@ app.post('/api/celik-hasir-planlama/upload', upload.single('file'), async (req, 
   }
 });
 
-// Simple scheduling endpoint
+// Advanced production scheduling endpoint using ProductionScheduler
 app.post('/api/celik-hasir-planlama/schedule/:sessionId', async (req, res) => {
   try {
     const { sessionId } = req.params;
@@ -3793,7 +3928,7 @@ app.post('/api/celik-hasir-planlama/schedule/:sessionId', async (req, res) => {
     const ordersResult = await pool.query(`
       SELECT * FROM celik_hasir_planlama_production_orders
       WHERE session_id = $1 AND is_regular_product = true
-      ORDER BY total_tonnage DESC
+      ORDER BY primary_diameter DESC, total_tonnage DESC
     `, [sessionId]);
 
     const orders = ordersResult.rows;
@@ -3801,45 +3936,265 @@ app.post('/api/celik-hasir-planlama/schedule/:sessionId', async (req, res) => {
       return res.json({ message: 'No orders to schedule' });
     }
 
-    // Simple machine assignment
-    const machines = ['MG316', 'MG208-1', 'MG208-2', 'EUROBEND'];
-    let currentMachine = 0;
+    // Get production speed matrix
+    const speedsResult = await pool.query(`
+      SELECT * FROM celik_hasir_planlama_production_speeds
+    `);
 
-    const schedules = orders.map((order, index) => ({
-      session_id: parseInt(sessionId),
-      production_order_id: order.id,
-      assigned_machine_id: machines[currentMachine],
-      sequence_number: Math.floor(index / machines.length) + 1,
-      day_number: Math.floor(index / (machines.length * 10)) + 1,
-      production_time_minutes: Math.max(60, order.total_tonnage * 10),
-      status: 'scheduled'
-    }));
+    const speedMatrix = {};
+    speedsResult.rows.forEach(row => {
+      const key = `${row.machine_id}_${row.cap}_${row.en_ara}`;
+      speedMatrix[key] = row.vurus_per_minute;
+    });
 
-    // Cycle through machines
-    currentMachine = (currentMachine + 1) % machines.length;
+    // Get changeover times
+    const changeoverResult = await pool.query(`
+      SELECT * FROM celik_hasir_planlama_changeover_times
+    `);
 
-    // Insert schedules
-    for (const schedule of schedules) {
-      await pool.query(`
-        INSERT INTO celik_hasir_planlama_production_schedules (
-          session_id, production_order_id, assigned_machine_id, sequence_number,
-          day_number, production_time_minutes, status
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7)
-      `, [
-        schedule.session_id, schedule.production_order_id, schedule.assigned_machine_id,
-        schedule.sequence_number, schedule.day_number, schedule.production_time_minutes,
-        schedule.status
-      ]);
+    const changeoverMatrix = {};
+    changeoverResult.rows.forEach(row => {
+      const key = `${row.machine_id}_${row.from_diameter}_${row.to_diameter}`;
+      changeoverMatrix[key] = row.changeover_minutes;
+    });
+
+    // Initialize production scheduler
+    const ProductionScheduler = class {
+      constructor() {
+        this.machineConfig = {
+          'MG316': { capacity: 1440, priority: 1, isFullyAutomatic: true, preferredForBulk: true },
+          'EUROBEND': { capacity: 1440, priority: 2, isFullyAutomatic: true, preferredForBulk: true },
+          'MG208-1': { capacity: 1440, priority: 3, isFullyAutomatic: false },
+          'MG208-2': { capacity: 1440, priority: 4, isFullyAutomatic: false }
+        };
+      }
+
+      filterActiveOrders(orders) {
+        return orders.filter(order => order.uretim_kalan > 0).map(order => ({
+          ...order,
+          remainingQty: order.uretim_kalan,
+          diameter: order.primary_diameter,
+          meshType: order.mesh_type,
+          isStockCustomer: (order.firma || '').includes('ALBAYRAK MÜŞTERİ'),
+          weight: order.birim_agirlik * order.uretim_kalan
+        }));
+      }
+
+      groupByDiameter(orders) {
+        const groups = {};
+        orders.forEach(order => {
+          const diameterGroup = Math.round(order.diameter * 2) / 2;
+          if (!groups[diameterGroup]) {
+            groups[diameterGroup] = {
+              diameter: diameterGroup,
+              orders: [],
+              totalQty: 0,
+              totalWeight: 0,
+              totalTime: 0
+            };
+          }
+          groups[diameterGroup].orders.push(order);
+          groups[diameterGroup].totalQty += order.remainingQty;
+          groups[diameterGroup].totalWeight += order.weight;
+        });
+        return Object.values(groups).sort((a, b) => b.diameter - a.diameter);
+      }
+
+      calculateProductionTimes(diameterGroups, speedMatrix) {
+        diameterGroups.forEach(group => {
+          group.orders.forEach(order => {
+            // Enhanced production speed calculation using stock data
+            const diameter = order.diameter || order.primary_diameter || 4.5;
+            const enAra = order.en_ara || 15;
+
+            // Try multiple speed matrix key formats
+            const keys = [
+              `MG316_${diameter}_${enAra}`,
+              `${diameter}_${enAra}`,
+              `MG316_${Math.round(diameter * 2) / 2}_${enAra}`,
+              `${Math.round(diameter * 2) / 2}_${enAra}`
+            ];
+
+            let speed = 100; // Default speed
+            for (const key of keys) {
+              if (speedMatrix[key]) {
+                speed = speedMatrix[key];
+                break;
+              }
+            }
+
+            // Apply stock-based adjustments if available
+            if (order.has_stock_data) {
+              // More complex products take longer
+              if (order.dis_cap_en_cubuk_ad && order.dis_cap_en_cubuk_ad > 25) {
+                speed *= 0.85; // 15% slower for complex products
+              }
+
+              // Larger mesh spacing = faster production
+              if (enAra > 20) speed *= 1.1;
+              else if (enAra < 10) speed *= 0.9;
+            }
+
+            order.productionTime = Math.ceil(order.remainingQty / speed);
+            order.setupTime = this.calculateSetupTime(order, diameter);
+            order.totalTime = order.productionTime + order.setupTime;
+          });
+          group.totalTime = group.orders.reduce((sum, order) => sum + order.totalTime, 0);
+        });
+        return diameterGroups;
+      }
+
+      calculateSetupTime(order, diameter) {
+        let setupTime = 10; // Base setup time
+
+        // Complex products need more setup time
+        if (order.has_stock_data && order.dis_cap_en_cubuk_ad > 20) {
+          setupTime += 5;
+        }
+
+        // Larger diameters need more setup time
+        if (diameter > 8) setupTime += 5;
+        else if (diameter < 5) setupTime -= 2;
+
+        return Math.max(5, setupTime); // Minimum 5 minutes
+      }
+
+      assignToMachines(diameterGroups) {
+        const assignments = {
+          'MG316': { orders: [], totalTime: 0, totalDays: 0 },
+          'EUROBEND': { orders: [], totalTime: 0, totalDays: 0 },
+          'MG208-1': { orders: [], totalTime: 0, totalDays: 0 },
+          'MG208-2': { orders: [], totalTime: 0, totalDays: 0 }
+        };
+
+        const machineOrder = ['MG316', 'EUROBEND', 'MG208-1', 'MG208-2'];
+
+        diameterGroups.forEach(group => {
+          let bestMachine = null;
+          let minTime = Infinity;
+
+          if (group.totalQty > 50 || group.totalWeight > 1000) {
+            // Bulk orders go to tam otomatik
+            for (const machine of ['MG316', 'EUROBEND']) {
+              if (assignments[machine].totalTime < minTime) {
+                minTime = assignments[machine].totalTime;
+                bestMachine = machine;
+              }
+            }
+          } else {
+            // Smaller orders - find least loaded machine
+            for (const machine of machineOrder) {
+              if (assignments[machine].totalTime < minTime) {
+                minTime = assignments[machine].totalTime;
+                bestMachine = machine;
+              }
+            }
+          }
+
+          if (bestMachine) {
+            assignments[bestMachine].orders.push(...group.orders);
+            assignments[bestMachine].totalTime += group.totalTime;
+            assignments[bestMachine].totalDays = Math.ceil(assignments[bestMachine].totalTime / 1440);
+          }
+        });
+
+        return assignments;
+      }
+
+      optimizeSequence(assignments, changeoverMatrix) {
+        Object.keys(assignments).forEach(machine => {
+          const orders = assignments[machine].orders;
+          if (orders.length <= 1) return;
+
+          orders.sort((a, b) => {
+            if (Math.abs(a.diameter - b.diameter) > 0.1) {
+              return b.diameter - a.diameter;
+            }
+            return (a.meshType || '').localeCompare(b.meshType || '');
+          });
+
+          let cumulativeTime = 0;
+          orders.forEach((order, index) => {
+            if (index > 0) {
+              const prevOrder = orders[index - 1];
+              const changeover = Math.ceil(Math.abs(prevOrder.diameter - order.diameter) * 2) * 10;
+              cumulativeTime += changeover;
+            }
+
+            order.startTime = cumulativeTime;
+            cumulativeTime += order.totalTime;
+            order.endTime = cumulativeTime;
+            order.sequenceNumber = index + 1;
+            order.assignedMachine = machine;
+            order.dayNumber = Math.ceil(order.endTime / 1440);
+          });
+
+          assignments[machine].totalTimeWithChangeover = cumulativeTime;
+          assignments[machine].totalDaysWithChangeover = Math.ceil(cumulativeTime / 1440);
+        });
+
+        return assignments;
+      }
+
+      async scheduleProduction(orders, speedMatrix, changeoverMatrix) {
+        const activeOrders = this.filterActiveOrders(orders);
+        const diameterGroups = this.groupByDiameter(activeOrders);
+        const ordersWithTime = this.calculateProductionTimes(diameterGroups, speedMatrix);
+        const machineAssignments = this.assignToMachines(ordersWithTime);
+        const finalSchedule = this.optimizeSequence(machineAssignments, changeoverMatrix);
+        return finalSchedule;
+      }
+    };
+
+    const scheduler = new ProductionScheduler();
+    const schedule = await scheduler.scheduleProduction(orders, speedMatrix, changeoverMatrix);
+
+    // Delete existing schedules for this session
+    await pool.query('DELETE FROM celik_hasir_planlama_production_schedules WHERE session_id = $1', [sessionId]);
+
+    // Insert optimized schedules
+    let totalSchedules = 0;
+    for (const [machineId, machineData] of Object.entries(schedule)) {
+      for (const order of machineData.orders) {
+        await pool.query(`
+          INSERT INTO celik_hasir_planlama_production_schedules (
+            session_id, production_order_id, assigned_machine_id, sequence_number,
+            day_number, start_time_minutes, end_time_minutes, production_time_minutes,
+            changeover_time_minutes, total_time_minutes, status, is_optimized
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        `, [
+          sessionId, order.id, machineId, order.sequenceNumber,
+          order.dayNumber, order.startTime, order.endTime, order.productionTime,
+          order.setupTime || 0, order.totalTime, 'scheduled', true
+        ]);
+        totalSchedules++;
+      }
     }
 
+    // Calculate analytics
+    const analytics = {
+      totalOrders: totalSchedules,
+      machineUtilization: {}
+    };
+
+    Object.entries(schedule).forEach(([machine, data]) => {
+      analytics.machineUtilization[machine] = {
+        orders: data.orders.length,
+        days: data.totalDaysWithChangeover || 0,
+        utilization: Math.min(100, ((data.totalTimeWithChangeover || 0) / (1440 * (data.totalDaysWithChangeover || 1))) * 100)
+      };
+    });
+
     res.json({
-      message: 'Scheduling completed',
-      orders_scheduled: schedules.length,
-      machines_used: machines.length
+      message: 'Advanced production scheduling completed',
+      orders_scheduled: totalSchedules,
+      machines_used: 4,
+      schedule_analytics: analytics,
+      total_production_days: Math.max(...Object.values(schedule).map(m => m.totalDaysWithChangeover || 0))
     });
 
   } catch (error) {
-    console.error('❌ Scheduling error:', error);
+    console.error('❌ Advanced scheduling error:', error);
     res.status(500).json({ error: error.message });
   }
 });

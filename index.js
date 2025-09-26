@@ -660,7 +660,13 @@ const tables = [
     'celik_hasir_netsis_mm_recete',
     'celik_hasir_netsis_ncbk_recete',
     'celik_hasir_netsis_ntel_recete',
-    'celik_hasir_netsis_sequence'
+    'celik_hasir_netsis_sequence',
+    // Çelik Hasır Planlama tabloları
+    'celik_hasir_planlama_sessions',
+    'celik_hasir_planlama_production_orders',
+    'celik_hasir_planlama_production_schedules',
+    'celik_hasir_planlama_production_speeds',
+    'celik_hasir_planlama_changeover_times'
 ];
 
 // Tablo varlığını kontrol et, yoksa oluştur

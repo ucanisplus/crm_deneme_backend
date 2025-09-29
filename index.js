@@ -301,6 +301,102 @@ app.get('/api/test', async (req, res) => {
     }
 });
 
+// Filmaşin Priority Mapping API
+app.get('/api/filmasin-priority/:targetDiameter/:priority', async (req, res) => {
+    try {
+        const { targetDiameter, priority } = req.params;
+
+        console.log(`🔍 FILMAŞIN API: Looking for diameter ${targetDiameter}, priority ${priority}`);
+
+        const query = `
+            SELECT filmasin_diameter, filmasin_quality
+            FROM celik_hasir_netsis_filmasin_map
+            WHERE target_diameter = $1 AND priority = $2
+        `;
+
+        const result = await pool.query(query, [parseFloat(targetDiameter), parseInt(priority)]);
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({
+                error: 'No filmaşin found for this diameter and priority',
+                targetDiameter: parseFloat(targetDiameter),
+                priority: parseInt(priority)
+            });
+        }
+
+        const filmasin = result.rows[0];
+        const flmCode = `FLM.${String(Math.round(filmasin.filmasin_diameter * 100)).padStart(4, '0')}.${filmasin.filmasin_quality}`;
+
+        console.log(`✅ FILMAŞIN API: Found ${flmCode}`);
+
+        res.json({
+            code: flmCode,
+            diameter: parseFloat(filmasin.filmasin_diameter),
+            quality: filmasin.filmasin_quality,
+            targetDiameter: parseFloat(targetDiameter),
+            priority: parseInt(priority)
+        });
+
+    } catch (error) {
+        console.error('❌ FILMAŞIN API Error:', error);
+        res.status(500).json({
+            error: 'Database query failed',
+            details: error.message
+        });
+    }
+});
+
+// Get all filmaşin alternatives for a target diameter
+app.get('/api/filmasin-alternatives/:targetDiameter', async (req, res) => {
+    try {
+        const { targetDiameter } = req.params;
+
+        console.log(`🔍 FILMAŞIN ALTERNATIVES API: Looking for all priorities for diameter ${targetDiameter}`);
+
+        const query = `
+            SELECT filmasin_diameter, filmasin_quality, priority
+            FROM celik_hasir_netsis_filmasin_map
+            WHERE target_diameter = $1
+            ORDER BY priority ASC
+        `;
+
+        const result = await pool.query(query, [parseFloat(targetDiameter)]);
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({
+                error: 'No filmaşin alternatives found for this diameter',
+                targetDiameter: parseFloat(targetDiameter)
+            });
+        }
+
+        const alternatives = result.rows.map(row => {
+            const flmCode = `FLM.${String(Math.round(row.filmasin_diameter * 100)).padStart(4, '0')}.${row.filmasin_quality}`;
+            return {
+                code: flmCode,
+                diameter: parseFloat(row.filmasin_diameter),
+                quality: row.filmasin_quality,
+                priority: parseInt(row.priority)
+            };
+        });
+
+        console.log(`✅ FILMAŞIN ALTERNATIVES API: Found ${alternatives.length} alternatives`);
+
+        res.json({
+            targetDiameter: parseFloat(targetDiameter),
+            alternatives: alternatives,
+            mainRecipe: alternatives.find(alt => alt.priority === 0) || null,
+            alternativeCount: alternatives.length - 1 // Exclude main recipe
+        });
+
+    } catch (error) {
+        console.error('❌ FILMAŞIN ALTERNATIVES API Error:', error);
+        res.status(500).json({
+            error: 'Database query failed',
+            details: error.message
+        });
+    }
+});
+
 // Kullanıcı Kayıt Rotası
 app.post('/api/signup', async (req, res) => {
     const { username, password, email, role = 'engineer_1' } = req.body;

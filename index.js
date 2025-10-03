@@ -1418,7 +1418,8 @@ async function createGalvanizliTelIndexes() {
 
 // Tablolar oluşturulduktan sonra varsayılan değerleri ve indexleri ekle
 setTimeout(insertDefaultUserInputValues, 5000);
-setTimeout(createGalvanizliTelIndexes, 6000);
+// DISABLED: Indexes already created, no need to recreate on every cold start
+// setTimeout(createGalvanizliTelIndexes, 6000);
 
 // DIAGNOSTIC ENDPOINT - Test galvanizli tel database connectivity
 app.get('/api/diagnostic/gal_test', async (req, res) => {

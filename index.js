@@ -98,6 +98,38 @@ const pool = new Pool({
     connectionTimeoutMillis: 10000
 });
 
+// 🧹 Database Connection Cleanup Function
+const cleanupIdleConnections = async () => {
+  try {
+    const result = await pool.query(`
+      SELECT pg_terminate_backend(pid)
+      FROM pg_stat_activity
+      WHERE datname = current_database()
+        AND pid <> pg_backend_pid()
+        AND state = 'idle'
+        AND state_change < now() - interval '5 minutes'
+        AND usename NOT IN (
+          SELECT rolname FROM pg_roles WHERE rolsuper = true
+        )
+    `);
+
+    const terminatedCount = result.rows.filter(r => r.pg_terminate_backend === true).length;
+    if (terminatedCount > 0) {
+      console.log(`🧹 Cleaned up ${terminatedCount} idle database connections`);
+    }
+  } catch (error) {
+    // Don't crash the server if cleanup fails
+    console.error('⚠️ Connection cleanup error:', error.message);
+  }
+};
+
+// Run cleanup once on startup
+cleanupIdleConnections();
+
+// Schedule cleanup every 10 minutes
+setInterval(cleanupIdleConnections, 10 * 60 * 1000);
+console.log('🧹 Database connection cleanup scheduled (every 10 minutes)');
+
 // Redis Configuration for Caching
 let redis;
 try {
@@ -3568,6 +3600,37 @@ app.get('/api/health', async (req, res) => {
     } catch (error) {
         res.status(503).json({
             status: 'unhealthy',
+            error: error.message
+        });
+    }
+});
+
+// 🧹 Manual Database Connection Cleanup Endpoint
+app.post('/api/maintenance/cleanup-connections', async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT pg_terminate_backend(pid)
+            FROM pg_stat_activity
+            WHERE datname = current_database()
+              AND pid <> pg_backend_pid()
+              AND state = 'idle'
+              AND state_change < now() - interval '5 minutes'
+              AND usename NOT IN (
+                SELECT rolname FROM pg_roles WHERE rolsuper = true
+              )
+        `);
+
+        const terminatedCount = result.rows.filter(r => r.pg_terminate_backend === true).length;
+
+        res.json({
+            success: true,
+            message: `Cleaned up ${terminatedCount} idle connections`,
+            terminatedCount
+        });
+    } catch (error) {
+        console.error('Manual cleanup error:', error);
+        res.status(500).json({
+            success: false,
             error: error.message
         });
     }

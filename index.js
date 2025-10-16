@@ -775,7 +775,6 @@ const tables = [
     'gal_cost_cal_mm_gt_recete',
     'gal_cost_cal_ym_gt_recete',
     'gal_cost_cal_ym_st_recete',
-    'gal_cost_cal_mm_gt_ym_st',
     'gal_cost_cal_sequence',
     'gal_cost_cal_sal_requests', // Talepler tablosu
     'gal_cost_cal_user_input_values', // Hesaplama değerleri için kullanıcı girdileri
@@ -905,19 +904,6 @@ async function checkAndCreateTable(tableName) {
             mm_gt_id UUID,
             ym_gt_id UUID,
             ym_st_id UUID
-          )
-        `;
-      } else if (tableName === 'gal_cost_cal_mm_gt_ym_st') {
-        // MM GT - YM ST ilişki tablosu
-        createTableQuery = `
-          CREATE TABLE ${tableName} (
-            id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-            mm_gt_id UUID NOT NULL,
-            ym_st_id UUID NOT NULL,
-            sira INT,
-            UNIQUE(mm_gt_id, ym_st_id)
           )
         `;
       } else if (tableName === 'celik_hasir_netsis_mm') {
@@ -2022,20 +2008,66 @@ app.get('/api/check-recipes', async (req, res) => {
     // YMGT ürününün kendisini bul (stok_kodu için)
     const ymGtProduct = await pool.query('SELECT stok_kodu FROM gal_cost_cal_ym_gt WHERE id = $1', [ym_gt_id]);
     
-    // İlişkiyi kontrol et
-    const relation = await pool.query(`
-      SELECT ym_st_id FROM gal_cost_cal_mm_gt_ym_st 
-      WHERE mm_gt_id = $1 
-      ORDER BY sira ASC LIMIT 1
-    `, [mm_gt_id]);
-    
-    const mainYmStId = relation.rows.length > 0 ? relation.rows[0].ym_st_id : null;
-    
-    // YMST reçetelerini kontrol et
+    // Find YM ST using the Tüm Ürünler Excel logic (MM GT → YM GT → YM ST)
+    let mainYmStId = null;
     let ymStRecipes = 0;
-    if (mainYmStId) {
-      const ymStResult = await pool.query('SELECT COUNT(*) FROM gal_cost_cal_ym_st_recete WHERE ym_st_id = $1', [mainYmStId]);
-      ymStRecipes = parseInt(ymStResult.rows[0].count);
+
+    try {
+      // Step 1: Get MM GT recipe to find YM GT bilesen
+      const mmGtRecipe = await pool.query(
+        `SELECT bilesen_kodu FROM gal_cost_cal_mm_gt_recete
+         WHERE mm_gt_id = $1 AND bilesen_kodu LIKE 'YM.GT.%'
+         ORDER BY sequence ASC LIMIT 1`,
+        [mm_gt_id]
+      );
+
+      if (mmGtRecipe.rows.length > 0) {
+        const ymGtBilesenKodu = mmGtRecipe.rows[0].bilesen_kodu;
+
+        // Step 2: Find YM GT product by stok_kodu
+        const ymGtProduct = await pool.query(
+          `SELECT id FROM gal_cost_cal_ym_gt WHERE stok_kodu = $1 LIMIT 1`,
+          [ymGtBilesenKodu]
+        );
+
+        if (ymGtProduct.rows.length > 0) {
+          const foundYmGtId = ymGtProduct.rows[0].id;
+
+          // Step 3: Get YM GT recipe to find YM ST bilesen
+          const ymGtRecipe = await pool.query(
+            `SELECT bilesen_kodu FROM gal_cost_cal_ym_gt_recete
+             WHERE ym_gt_id = $1 AND bilesen_kodu LIKE 'YM.ST.%'
+             ORDER BY sequence ASC LIMIT 1`,
+            [foundYmGtId]
+          );
+
+          if (ymGtRecipe.rows.length > 0) {
+            const ymStBilesenKodu = ymGtRecipe.rows[0].bilesen_kodu;
+
+            // Step 4: Find YM ST product by stok_kodu with priority 0
+            const ymStProduct = await pool.query(
+              `SELECT id FROM gal_cost_cal_ym_st
+               WHERE stok_kodu = $1 AND (priority = 0 OR priority IS NULL)
+               LIMIT 1`,
+              [ymStBilesenKodu]
+            );
+
+            if (ymStProduct.rows.length > 0) {
+              mainYmStId = ymStProduct.rows[0].id;
+
+              // Get YM ST recipes count
+              const ymStResult = await pool.query(
+                'SELECT COUNT(*) FROM gal_cost_cal_ym_st_recete WHERE ym_st_id = $1',
+                [mainYmStId]
+              );
+              ymStRecipes = parseInt(ymStResult.rows[0].count);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error finding YM ST through recipe chain:', error);
+      // Continue with mainYmStId = null
     }
     
     res.json({
@@ -2518,14 +2550,6 @@ async function deleteRelatedRecords(table, id) {
           }
         }
         
-        // MM GT-YM ST ilişkilerini sil
-        try {
-          const deletedRelations = await pool.query('DELETE FROM gal_cost_cal_mm_gt_ym_st WHERE mm_gt_id = $1', [id]);
-          console.log(`✅ MM GT-YM ST ilişkileri silindi: ${deletedRelations.rowCount}`);
-        } catch (error) {
-          console.log(`⚠️ MM GT-YM ST ilişkileri silinirken hata:`, error.message);
-        }
-        
         // MM GT reçetelerini sil
         try {
           const deletedRecipes = await pool.query('DELETE FROM gal_cost_cal_mm_gt_recete WHERE mm_gt_id = $1', [id]);
@@ -2548,15 +2572,8 @@ async function deleteRelatedRecords(table, id) {
       }
     }
     
-    // YM ST siliniyorsa, ilişkili MM GT-YM ST ilişkilerini ve reçeteleri sil
+    // YM ST siliniyorsa, ilişkili reçeteleri sil
     if (table === 'gal_cost_cal_ym_st') {
-      try {
-        const deletedRelations = await pool.query('DELETE FROM gal_cost_cal_mm_gt_ym_st WHERE ym_st_id = $1', [id]);
-        console.log(`✅ MM GT-YM ST ilişkileri silindi: ${deletedRelations.rowCount}`);
-      } catch (error) {
-        console.log(`⚠️ MM GT-YM ST ilişkileri silinirken hata:`, error.message);
-      }
-      
       try {
         const deletedRecipes = await pool.query('DELETE FROM gal_cost_cal_ym_st_recete WHERE ym_st_id = $1', [id]);
         console.log(`✅ YM ST reçeteleri silindi: ${deletedRecipes.rowCount}`);

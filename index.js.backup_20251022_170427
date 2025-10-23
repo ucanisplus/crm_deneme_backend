@@ -4559,13 +4559,8 @@ app.get('/api/celik-hasir-planlama/export/:sessionId', async (req, res) => {
 });
 
 
-// ═══════════════════════════════════════════════════════════════
-// TAVLI NETSIS ENDPOINTS - CORRECTED for NO FOREIGN KEYS
-// Uses stok_kodu fields instead of ID fields
-// ═══════════════════════════════════════════════════════════════
-
 // ==========================================
-// YM TT (Tavli Tel Intermediate)
+// TAVLI NETSIS - YM TT (Tavli Tel Intermediate)
 // ==========================================
 app.get('/api/tavli_netsis_ym_tt', async (req, res) => {
   try {
@@ -4581,52 +4576,31 @@ app.get('/api/tavli_netsis_ym_tt', async (req, res) => {
   } catch (err) { console.error('Error:', err); res.status(500).json({ error: err.message }); }
 });
 
+app.get('/api/tavli_netsis_ym_tt/:id', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM tavli_netsis_ym_tt WHERE id = $1', [req.params.id]);
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Not found' });
+    res.json(result.rows[0]);
+  } catch (err) { console.error('Error:', err); res.status(500).json({ error: err.message }); }
+});
+
 app.post('/api/tavli_netsis_ym_tt', async (req, res) => {
   try {
-    // Extract ALL fields from request body
-    const fields = req.body;
-    const result = await pool.query(
-      `INSERT INTO tavli_netsis_ym_tt (
-        stok_kodu, stok_adi, product_type, grup_kodu, kod_1, kod_2, turu, mamul_grup,
-        muh_detay, depo_kodu, br_1, br_2, pay_1, payda_1, cevrim_degeri_1, olcu_br_3,
-        cevrim_pay_2, cevrim_payda_2, cevrim_degeri_2, cap, cap2, kalite,
-        min_mukavemet, max_mukavemet, ic_cap, dis_cap, kg, tolerans_plus, tolerans_minus,
-        tolerans_aciklama, shrink, unwinding, cast_kont, helix_kont, elongation,
-        satis_kdv_orani, alis_kdv_orani, stok_turu, fiyat_birimi, satis_tipi,
-        birim_agirlik, esnek_yapilandir, super_recete_kullanilsin, alis_doviz_tipi,
-        gumruk_tarife_kodu, ingilizce_isim, metarial, dia_mm, dia_tol_mm_plus,
-        dia_tol_mm_minus, zing_coating, tensile_st_min, tensile_st_max, wax,
-        lifting_lugs, coil_dimensions_id, coil_dimensions_od, coil_weight,
-        coil_weight_min, coil_weight_max, source_mm_stok_kodu, source_ym_st_stok_kodu,
-        sequence, created_by, notes
-      ) VALUES (
-        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
-        $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30,
-        $31, $32, $33, $34, $35, $36, $37, $38, $39, $40, $41, $42, $43, $44,
-        $45, $46, $47, $48, $49, $50, $51, $52, $53, $54, $55, $56, $57, $58,
-        $59, $60, $61, $62, $63
-      ) RETURNING *`,
-      [
-        fields.stok_kodu, fields.stok_adi, fields.product_type, fields.grup_kodu,
-        fields.kod_1, fields.kod_2, fields.turu, fields.mamul_grup, fields.muh_detay,
-        fields.depo_kodu, fields.br_1, fields.br_2, fields.pay_1, fields.payda_1,
-        fields.cevrim_degeri_1, fields.olcu_br_3, fields.cevrim_pay_2, fields.cevrim_payda_2,
-        fields.cevrim_degeri_2, fields.cap, fields.cap2, fields.kalite, fields.min_mukavemet,
-        fields.max_mukavemet, fields.ic_cap, fields.dis_cap, fields.kg, fields.tolerans_plus,
-        fields.tolerans_minus, fields.tolerans_aciklama, fields.shrink, fields.unwinding,
-        fields.cast_kont, fields.helix_kont, fields.elongation, fields.satis_kdv_orani,
-        fields.alis_kdv_orani, fields.stok_turu, fields.fiyat_birimi, fields.satis_tipi,
-        fields.birim_agirlik, fields.esnek_yapilandir, fields.super_recete_kullanilsin,
-        fields.alis_doviz_tipi, fields.gumruk_tarife_kodu, fields.ingilizce_isim,
-        fields.metarial, fields.dia_mm, fields.dia_tol_mm_plus, fields.dia_tol_mm_minus,
-        fields.zing_coating, fields.tensile_st_min, fields.tensile_st_max, fields.wax,
-        fields.lifting_lugs, fields.coil_dimensions_id, fields.coil_dimensions_od,
-        fields.coil_weight, fields.coil_weight_min, fields.coil_weight_max,
-        fields.source_mm_stok_kodu, fields.source_ym_st_stok_kodu, fields.sequence,
-        fields.created_by, fields.notes
-      ]
-    );
+    const {stok_kodu, stok_adi, product_type, cap, kod_2, kalite, min_mukavemet, max_mukavemet, ic_cap, dis_cap, kg, tolerans_plus, tolerans_minus, shrink, unwinding, source_mm_id, source_ym_st_id, sequence, created_by, notes} = req.body;
+    const result = await pool.query(`INSERT INTO tavli_netsis_ym_tt (stok_kodu, stok_adi, product_type, cap, kod_2, kalite, min_mukavemet, max_mukavemet, ic_cap, dis_cap, kg, tolerans_plus, tolerans_minus, shrink, unwinding, source_mm_id, source_ym_st_id, sequence, created_by, notes) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20) RETURNING *`,
+      [stok_kodu, stok_adi, product_type, cap, kod_2, kalite, min_mukavemet, max_mukavemet, ic_cap, dis_cap, kg, tolerans_plus, tolerans_minus, shrink, unwinding, source_mm_id, source_ym_st_id, sequence, created_by, notes]);
     res.status(201).json(result.rows[0]);
+  } catch (err) { console.error('Error:', err); res.status(500).json({ error: err.message }); }
+});
+
+app.put('/api/tavli_netsis_ym_tt/:id', async (req, res) => {
+  try {
+    const fields = Object.keys(req.body);
+    const values = Object.values(req.body);
+    const setClause = fields.map((field, idx) => `${field} = $${idx + 2}`).join(', ');
+    const result = await pool.query(`UPDATE tavli_netsis_ym_tt SET ${setClause}, updated_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING *`, [req.params.id, ...values]);
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Not found' });
+    res.json(result.rows[0]);
   } catch (err) { console.error('Error:', err); res.status(500).json({ error: err.message }); }
 });
 
@@ -4641,10 +4615,10 @@ app.delete('/api/tavli_netsis_ym_tt/:id', async (req, res) => {
 // YM TT Recipes
 app.get('/api/tavli_netsis_ym_tt_recete', async (req, res) => {
   try {
-    const { ym_tt_stok_kodu, mamul_kodu, limit = 2000 } = req.query;
+    const { ym_tt_id, mamul_kodu, limit = 2000 } = req.query;
     let query = 'SELECT * FROM tavli_netsis_ym_tt_recete WHERE 1=1';
     const params = [];
-    if (ym_tt_stok_kodu) { params.push(ym_tt_stok_kodu); query += ` AND ym_tt_stok_kodu = $${params.length}`; }
+    if (ym_tt_id) { params.push(ym_tt_id); query += ` AND ym_tt_id = $${params.length}`; }
     if (mamul_kodu) { params.push(mamul_kodu); query += ` AND mamul_kodu = $${params.length}`; }
     query += ' ORDER BY sira_no ASC';
     if (limit) { params.push(limit); query += ` LIMIT $${params.length}`; }
@@ -4655,12 +4629,9 @@ app.get('/api/tavli_netsis_ym_tt_recete', async (req, res) => {
 
 app.post('/api/tavli_netsis_ym_tt_recete', async (req, res) => {
   try {
-    const {ym_tt_stok_kodu, mamul_kodu, recete_toplama, bilesen_kodu, operasyon_bilesen, miktar, olcu_br, olcu_br_bilesen, ua_dahil_edilsin, son_operasyon, sira_no, aciklama, fire_orani, oto_rec} = req.body;
-    const result = await pool.query(
-      `INSERT INTO tavli_netsis_ym_tt_recete (ym_tt_stok_kodu, mamul_kodu, recete_toplama, bilesen_kodu, operasyon_bilesen, miktar, olcu_br, olcu_br_bilesen, ua_dahil_edilsin, son_operasyon, sira_no, aciklama, fire_orani, oto_rec)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING *`,
-      [ym_tt_stok_kodu, mamul_kodu, recete_toplama, bilesen_kodu, operasyon_bilesen, miktar, olcu_br, olcu_br_bilesen, ua_dahil_edilsin, son_operasyon, sira_no, aciklama, fire_orani || 0, oto_rec]
-    );
+    const {ym_tt_id, mamul_kodu, recete_toplama, bilesen_kodu, operasyon_bilesen, miktar, olcu_br, olcu_br_bilesen, ua_dahil_edilsin, son_operasyon, sira_no, aciklama, fire_orani, oto_rec} = req.body;
+    const result = await pool.query(`INSERT INTO tavli_netsis_ym_tt_recete (ym_tt_id, mamul_kodu, recete_toplama, bilesen_kodu, operasyon_bilesen, miktar, olcu_br, olcu_br_bilesen, ua_dahil_edilsin, son_operasyon, sira_no, aciklama, fire_orani, oto_rec) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING *`,
+      [ym_tt_id, mamul_kodu, recete_toplama, bilesen_kodu, operasyon_bilesen, miktar, olcu_br, olcu_br_bilesen, ua_dahil_edilsin, son_operasyon, sira_no, aciklama, fire_orani || 0, oto_rec]);
     res.status(201).json(result.rows[0]);
   } catch (err) { console.error('Error:', err); res.status(500).json({ error: err.message }); }
 });
@@ -4674,7 +4645,7 @@ app.delete('/api/tavli_netsis_ym_tt_recete/:id', async (req, res) => {
 });
 
 // ==========================================
-// YM YB (Yagli Balya Intermediate)
+// TAVLI NETSIS - YM YB (Yagli Balya Intermediate)
 // ==========================================
 app.get('/api/tavli_netsis_ym_yb', async (req, res) => {
   try {
@@ -4692,48 +4663,9 @@ app.get('/api/tavli_netsis_ym_yb', async (req, res) => {
 
 app.post('/api/tavli_netsis_ym_yb', async (req, res) => {
   try {
-    const fields = req.body;
-    const result = await pool.query(
-      `INSERT INTO tavli_netsis_ym_yb (
-        stok_kodu, stok_adi, product_type, grup_kodu, kod_1, kod_2, turu, mamul_grup,
-        muh_detay, depo_kodu, br_1, br_2, pay_1, payda_1, cevrim_degeri_1, olcu_br_3,
-        cevrim_pay_2, cevrim_payda_2, cevrim_degeri_2, cap, cap2, kalite,
-        min_mukavemet, max_mukavemet, ic_cap, dis_cap, kg, tolerans_plus, tolerans_minus,
-        tolerans_aciklama, shrink, unwinding, cast_kont, helix_kont, elongation,
-        satis_kdv_orani, alis_kdv_orani, stok_turu, fiyat_birimi, satis_tipi,
-        birim_agirlik, esnek_yapilandir, super_recete_kullanilsin, alis_doviz_tipi,
-        gumruk_tarife_kodu, ingilizce_isim, metarial, dia_mm, dia_tol_mm_plus,
-        dia_tol_mm_minus, zing_coating, tensile_st_min, tensile_st_max, wax,
-        lifting_lugs, coil_dimensions_id, coil_dimensions_od, coil_weight,
-        coil_weight_min, coil_weight_max, source_mm_stok_kodu, source_ym_tt_stok_kodu,
-        sequence, created_by, notes
-      ) VALUES (
-        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
-        $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30,
-        $31, $32, $33, $34, $35, $36, $37, $38, $39, $40, $41, $42, $43, $44,
-        $45, $46, $47, $48, $49, $50, $51, $52, $53, $54, $55, $56, $57, $58,
-        $59, $60, $61, $62, $63
-      ) RETURNING *`,
-      [
-        fields.stok_kodu, fields.stok_adi, fields.product_type, fields.grup_kodu,
-        fields.kod_1, fields.kod_2, fields.turu, fields.mamul_grup, fields.muh_detay,
-        fields.depo_kodu, fields.br_1, fields.br_2, fields.pay_1, fields.payda_1,
-        fields.cevrim_degeri_1, fields.olcu_br_3, fields.cevrim_pay_2, fields.cevrim_payda_2,
-        fields.cevrim_degeri_2, fields.cap, fields.cap2, fields.kalite, fields.min_mukavemet,
-        fields.max_mukavemet, fields.ic_cap, fields.dis_cap, fields.kg, fields.tolerans_plus,
-        fields.tolerans_minus, fields.tolerans_aciklama, fields.shrink, fields.unwinding,
-        fields.cast_kont, fields.helix_kont, fields.elongation, fields.satis_kdv_orani,
-        fields.alis_kdv_orani, fields.stok_turu, fields.fiyat_birimi, fields.satis_tipi,
-        fields.birim_agirlik, fields.esnek_yapilandir, fields.super_recete_kullanilsin,
-        fields.alis_doviz_tipi, fields.gumruk_tarife_kodu, fields.ingilizce_isim,
-        fields.metarial, fields.dia_mm, fields.dia_tol_mm_plus, fields.dia_tol_mm_minus,
-        fields.zing_coating, fields.tensile_st_min, fields.tensile_st_max, fields.wax,
-        fields.lifting_lugs, fields.coil_dimensions_id, fields.coil_dimensions_od,
-        fields.coil_weight, fields.coil_weight_min, fields.coil_weight_max,
-        fields.source_mm_stok_kodu, fields.source_ym_tt_stok_kodu, fields.sequence,
-        fields.created_by, fields.notes
-      ]
-    );
+    const {stok_kodu, stok_adi, product_type, cap, kod_2, kalite, min_mukavemet, max_mukavemet, ic_cap, dis_cap, kg, tolerans_plus, tolerans_minus, shrink, unwinding, source_mm_id, source_ym_tt_id, sequence, created_by, notes} = req.body;
+    const result = await pool.query(`INSERT INTO tavli_netsis_ym_yb (stok_kodu, stok_adi, product_type, cap, kod_2, kalite, min_mukavemet, max_mukavemet, ic_cap, dis_cap, kg, tolerans_plus, tolerans_minus, shrink, unwinding, source_mm_id, source_ym_tt_id, sequence, created_by, notes) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20) RETURNING *`,
+      [stok_kodu, stok_adi, product_type, cap, kod_2, kalite, min_mukavemet, max_mukavemet, ic_cap, dis_cap, kg, tolerans_plus, tolerans_minus, shrink, unwinding, source_mm_id, source_ym_tt_id, sequence, created_by, notes]);
     res.status(201).json(result.rows[0]);
   } catch (err) { console.error('Error:', err); res.status(500).json({ error: err.message }); }
 });
@@ -4749,10 +4681,10 @@ app.delete('/api/tavli_netsis_ym_yb/:id', async (req, res) => {
 // YM YB Recipes
 app.get('/api/tavli_netsis_ym_yb_recete', async (req, res) => {
   try {
-    const { ym_yb_stok_kodu, mamul_kodu, limit = 2000 } = req.query;
+    const { ym_yb_id, mamul_kodu, limit = 2000 } = req.query;
     let query = 'SELECT * FROM tavli_netsis_ym_yb_recete WHERE 1=1';
     const params = [];
-    if (ym_yb_stok_kodu) { params.push(ym_yb_stok_kodu); query += ` AND ym_yb_stok_kodu = $${params.length}`; }
+    if (ym_yb_id) { params.push(ym_yb_id); query += ` AND ym_yb_id = $${params.length}`; }
     if (mamul_kodu) { params.push(mamul_kodu); query += ` AND mamul_kodu = $${params.length}`; }
     query += ' ORDER BY sira_no ASC';
     if (limit) { params.push(limit); query += ` LIMIT $${params.length}`; }
@@ -4763,12 +4695,9 @@ app.get('/api/tavli_netsis_ym_yb_recete', async (req, res) => {
 
 app.post('/api/tavli_netsis_ym_yb_recete', async (req, res) => {
   try {
-    const {ym_yb_stok_kodu, mamul_kodu, recete_toplama, bilesen_kodu, operasyon_bilesen, miktar, olcu_br, olcu_br_bilesen, ua_dahil_edilsin, son_operasyon, sira_no, aciklama, fire_orani, oto_rec} = req.body;
-    const result = await pool.query(
-      `INSERT INTO tavli_netsis_ym_yb_recete (ym_yb_stok_kodu, mamul_kodu, recete_toplama, bilesen_kodu, operasyon_bilesen, miktar, olcu_br, olcu_br_bilesen, ua_dahil_edilsin, son_operasyon, sira_no, aciklama, fire_orani, oto_rec)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING *`,
-      [ym_yb_stok_kodu, mamul_kodu, recete_toplama, bilesen_kodu, operasyon_bilesen, miktar, olcu_br, olcu_br_bilesen, ua_dahil_edilsin, son_operasyon, sira_no, aciklama, fire_orani || 0, oto_rec]
-    );
+    const {ym_yb_id, mamul_kodu, recete_toplama, bilesen_kodu, operasyon_bilesen, miktar, olcu_br, olcu_br_bilesen, ua_dahil_edilsin, son_operasyon, sira_no, aciklama, fire_orani, oto_rec} = req.body;
+    const result = await pool.query(`INSERT INTO tavli_netsis_ym_yb_recete (ym_yb_id, mamul_kodu, recete_toplama, bilesen_kodu, operasyon_bilesen, miktar, olcu_br, olcu_br_bilesen, ua_dahil_edilsin, son_operasyon, sira_no, aciklama, fire_orani, oto_rec) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING *`,
+      [ym_yb_id, mamul_kodu, recete_toplama, bilesen_kodu, operasyon_bilesen, miktar, olcu_br, olcu_br_bilesen, ua_dahil_edilsin, son_operasyon, sira_no, aciklama, fire_orani || 0, oto_rec]);
     res.status(201).json(result.rows[0]);
   } catch (err) { console.error('Error:', err); res.status(500).json({ error: err.message }); }
 });
@@ -4782,7 +4711,7 @@ app.delete('/api/tavli_netsis_ym_yb_recete/:id', async (req, res) => {
 });
 
 // ==========================================
-// YM STP (Pressed Siyah Tel)
+// TAVLI NETSIS - YM STP (Pressed Siyah Tel)
 // ==========================================
 app.get('/api/tavli_netsis_ym_stp', async (req, res) => {
   try {
@@ -4800,33 +4729,9 @@ app.get('/api/tavli_netsis_ym_stp', async (req, res) => {
 
 app.post('/api/tavli_netsis_ym_stp', async (req, res) => {
   try {
-    const fields = req.body;
-    const result = await pool.query(
-      `INSERT INTO tavli_netsis_ym_stp (
-        stok_kodu, stok_adi, grup_kodu, kod_1, kod_2, kod_3, turu, muh_detay, depo_kodu,
-        br_1, br_2, pay_1, payda_1, cevrim_degeri_1, olcu_br_3, cevrim_pay_2, cevrim_payda_2,
-        cevrim_degeri_2, cap, filmasin, quality, min_mukavemet, max_mukavemet, ic_cap, dis_cap,
-        kg, tolerans_plus, tolerans_minus, satis_kdv_orani, stok_turu, fiyat_birimi, doviz_tip,
-        birim_agirlik, esnek_yapilandir, super_recete_kullanilsin, ingilizce_isim,
-        ozel_saha_1_say, priority, source_ym_st_stok_kodu, sequence, created_by, notes
-      ) VALUES (
-        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17,
-        $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32,
-        $33, $34, $35, $36, $37, $38, $39, $40, $41, $42
-      ) RETURNING *`,
-      [
-        fields.stok_kodu, fields.stok_adi, fields.grup_kodu, fields.kod_1, fields.kod_2,
-        fields.kod_3, fields.turu, fields.muh_detay, fields.depo_kodu, fields.br_1,
-        fields.br_2, fields.pay_1, fields.payda_1, fields.cevrim_degeri_1, fields.olcu_br_3,
-        fields.cevrim_pay_2, fields.cevrim_payda_2, fields.cevrim_degeri_2, fields.cap,
-        fields.filmasin, fields.quality, fields.min_mukavemet, fields.max_mukavemet,
-        fields.ic_cap, fields.dis_cap, fields.kg, fields.tolerans_plus, fields.tolerans_minus,
-        fields.satis_kdv_orani, fields.stok_turu, fields.fiyat_birimi, fields.doviz_tip,
-        fields.birim_agirlik, fields.esnek_yapilandir, fields.super_recete_kullanilsin,
-        fields.ingilizce_isim, fields.ozel_saha_1_say, fields.priority,
-        fields.source_ym_st_stok_kodu, fields.sequence, fields.created_by, fields.notes
-      ]
-    );
+    const {stok_kodu, stok_adi, cap, kod_2, kalite, min_mukavemet, max_mukavemet, ic_cap, dis_cap, kg, tolerans_plus, tolerans_minus, source_ym_st_id, sequence, created_by, notes} = req.body;
+    const result = await pool.query(`INSERT INTO tavli_netsis_ym_stp (stok_kodu, stok_adi, cap, kod_2, kalite, min_mukavemet, max_mukavemet, ic_cap, dis_cap, kg, tolerans_plus, tolerans_minus, source_ym_st_id, sequence, created_by, notes) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) RETURNING *`,
+      [stok_kodu, stok_adi, cap, kod_2, kalite, min_mukavemet, max_mukavemet, ic_cap, dis_cap, kg, tolerans_plus, tolerans_minus, source_ym_st_id, sequence, created_by, notes]);
     res.status(201).json(result.rows[0]);
   } catch (err) { console.error('Error:', err); res.status(500).json({ error: err.message }); }
 });
@@ -4842,10 +4747,10 @@ app.delete('/api/tavli_netsis_ym_stp/:id', async (req, res) => {
 // YM STP Recipes
 app.get('/api/tavli_netsis_ym_stp_recete', async (req, res) => {
   try {
-    const { ym_stp_stok_kodu, mamul_kodu, limit = 2000 } = req.query;
+    const { ym_stp_id, mamul_kodu, limit = 2000 } = req.query;
     let query = 'SELECT * FROM tavli_netsis_ym_stp_recete WHERE 1=1';
     const params = [];
-    if (ym_stp_stok_kodu) { params.push(ym_stp_stok_kodu); query += ` AND ym_stp_stok_kodu = $${params.length}`; }
+    if (ym_stp_id) { params.push(ym_stp_id); query += ` AND ym_stp_id = $${params.length}`; }
     if (mamul_kodu) { params.push(mamul_kodu); query += ` AND mamul_kodu = $${params.length}`; }
     query += ' ORDER BY sira_no ASC';
     if (limit) { params.push(limit); query += ` LIMIT $${params.length}`; }
@@ -4856,12 +4761,9 @@ app.get('/api/tavli_netsis_ym_stp_recete', async (req, res) => {
 
 app.post('/api/tavli_netsis_ym_stp_recete', async (req, res) => {
   try {
-    const {ym_stp_stok_kodu, mamul_kodu, recete_toplama, bilesen_kodu, operasyon_bilesen, miktar, olcu_br, olcu_br_bilesen, ua_dahil_edilsin, son_operasyon, sira_no, aciklama, fire_orani, oto_rec} = req.body;
-    const result = await pool.query(
-      `INSERT INTO tavli_netsis_ym_stp_recete (ym_stp_stok_kodu, mamul_kodu, recete_toplama, bilesen_kodu, operasyon_bilesen, miktar, olcu_br, olcu_br_bilesen, ua_dahil_edilsin, son_operasyon, sira_no, aciklama, fire_orani, oto_rec)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING *`,
-      [ym_stp_stok_kodu, mamul_kodu, recete_toplama, bilesen_kodu, operasyon_bilesen, miktar, olcu_br, olcu_br_bilesen, ua_dahil_edilsin, son_operasyon, sira_no, aciklama, fire_orani || 0, oto_rec]
-    );
+    const {ym_stp_id, mamul_kodu, recete_toplama, bilesen_kodu, operasyon_bilesen, miktar, olcu_br, olcu_br_bilesen, ua_dahil_edilsin, son_operasyon, sira_no, aciklama, fire_orani, oto_rec} = req.body;
+    const result = await pool.query(`INSERT INTO tavli_netsis_ym_stp_recete (ym_stp_id, mamul_kodu, recete_toplama, bilesen_kodu, operasyon_bilesen, miktar, olcu_br, olcu_br_bilesen, ua_dahil_edilsin, son_operasyon, sira_no, aciklama, fire_orani, oto_rec) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING *`,
+      [ym_stp_id, mamul_kodu, recete_toplama, bilesen_kodu, operasyon_bilesen, miktar, olcu_br, olcu_br_bilesen, ua_dahil_edilsin, son_operasyon, sira_no, aciklama, fire_orani || 0, oto_rec]);
     res.status(201).json(result.rows[0]);
   } catch (err) { console.error('Error:', err); res.status(500).json({ error: err.message }); }
 });
@@ -4875,6 +4777,41 @@ app.delete('/api/tavli_netsis_ym_stp_recete/:id', async (req, res) => {
 });
 
 // ==========================================
+// TAVLI NETSIS - Relationships
+// ==========================================
+app.get('/api/tavli_netsis_relationships', async (req, res) => {
+  try {
+    const { mm_id, ym_st_id, ym_tt_id, ym_yb_id, ym_stp_id } = req.query;
+    let query = 'SELECT * FROM tavli_netsis_relationships WHERE 1=1';
+    const params = [];
+    if (mm_id) { params.push(mm_id); query += ` AND mm_id = $${params.length}`; }
+    if (ym_st_id) { params.push(ym_st_id); query += ` AND ym_st_id = $${params.length}`; }
+    if (ym_tt_id) { params.push(ym_tt_id); query += ` AND ym_tt_id = $${params.length}`; }
+    if (ym_yb_id) { params.push(ym_yb_id); query += ` AND ym_yb_id = $${params.length}`; }
+    if (ym_stp_id) { params.push(ym_stp_id); query += ` AND ym_stp_id = $${params.length}`; }
+    query += ' ORDER BY sequence_index ASC';
+    const result = await pool.query(query, params);
+    res.json(result.rows);
+  } catch (err) { console.error('Error:', err); res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/tavli_netsis_relationships', async (req, res) => {
+  try {
+    const {mm_id, ym_tt_id, ym_yb_id, ym_stp_id, ym_st_id, is_main, sequence_index, needs_pressing, needs_oiling} = req.body;
+    const result = await pool.query(`INSERT INTO tavli_netsis_relationships (mm_id, ym_tt_id, ym_yb_id, ym_stp_id, ym_st_id, is_main, sequence_index, needs_pressing, needs_oiling) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+      [mm_id, ym_tt_id, ym_yb_id, ym_stp_id, ym_st_id, is_main, sequence_index, needs_pressing, needs_oiling]);
+    res.status(201).json(result.rows[0]);
+  } catch (err) { console.error('Error:', err); res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/tavli_netsis_relationships/:id', async (req, res) => {
+  try {
+    const result = await pool.query('DELETE FROM tavli_netsis_relationships WHERE id = $1 RETURNING *', [req.params.id]);
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Not found' });
+    res.json({ message: 'Deleted successfully' });
+  } catch (err) { console.error('Error:', err); res.status(500).json({ error: err.message }); }
+});
+
 const PORT = process.env.PORT || 4000;
 if (process.env.NODE_ENV !== 'production') {
     app.listen(PORT, () => {

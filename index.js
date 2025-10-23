@@ -2129,9 +2129,23 @@ for (const table of tables) {
                       const columns = Object.keys(normalizedItem).join(', ');
                       const placeholders = Object.keys(normalizedItem).map((_, index) => `$${index + 1}`).join(', ');
                       const values = Object.values(normalizedItem);
-                      
-                      const query = `INSERT INTO ${table} (${columns}) VALUES (${placeholders}) RETURNING *`;
-                      
+
+                      // Use UPSERT for sequence table to prevent duplicates
+                      let query;
+                      if (table === 'celik_hasir_netsis_sequence') {
+                        query = `
+                          INSERT INTO ${table} (${columns})
+                          VALUES (${placeholders})
+                          ON CONFLICT (product_type, kod_2, cap_code)
+                          DO UPDATE SET
+                            last_sequence = EXCLUDED.last_sequence,
+                            updated_at = NOW()
+                          RETURNING *
+                        `;
+                      } else {
+                        query = `INSERT INTO ${table} (${columns}) VALUES (${placeholders}) RETURNING *`;
+                      }
+
                       console.log(`📥 Ekleniyor: ${table} (dizi öğesi)`);
                       
                       const result = await pool.query(query, values);
@@ -2190,9 +2204,23 @@ for (const table of tables) {
                 const columns = Object.keys(data).join(', ');
                 const placeholders = Object.keys(data).map((_, index) => `$${index + 1}`).join(', ');
                 const values = Object.values(data);
-                
-                const query = `INSERT INTO ${table} (${columns}) VALUES (${placeholders}) RETURNING *`;
-                
+
+                // Use UPSERT for sequence table to prevent duplicates
+                let query;
+                if (table === 'celik_hasir_netsis_sequence') {
+                  query = `
+                    INSERT INTO ${table} (${columns})
+                    VALUES (${placeholders})
+                    ON CONFLICT (product_type, kod_2, cap_code)
+                    DO UPDATE SET
+                      last_sequence = EXCLUDED.last_sequence,
+                      updated_at = NOW()
+                    RETURNING *
+                  `;
+                } else {
+                  query = `INSERT INTO ${table} (${columns}) VALUES (${placeholders}) RETURNING *`;
+                }
+
                 console.log(`📥 Ekleniyor: ${table}`);
                 console.log("🧾 Sütunlar:", columns);
                 

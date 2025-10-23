@@ -780,6 +780,19 @@ const tables = [
     'gal_cost_cal_user_input_values', // Hesaplama değerleri için kullanıcı girdileri
     'gal_cost_cal_user_tlc_hizlar', // TLC Hızlar tablosu için
 
+    // Tavlı Tel / Balya Teli tabloları
+    'tavli_balya_tel_mm',
+    'tavli_balya_tel_mm_recete',
+    'tavli_balya_tel_mm_ym_st',
+    'tavli_balya_tel_sal_requests',
+    'tavli_balya_tel_sequence',
+    'tavli_netsis_ym_tt',
+    'tavli_netsis_ym_tt_recete',
+    'tavli_netsis_ym_yb',
+    'tavli_netsis_ym_yb_recete',
+    'tavli_netsis_ym_stp',
+    'tavli_netsis_ym_stp_recete',
+
     // Çelik Hasır Netsis tabloları
     'celik_hasir_netsis_mm',
     'celik_hasir_netsis_ym_ncbk',

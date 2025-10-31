@@ -4916,6 +4916,118 @@ app.delete('/api/tavli_netsis_ym_stp_recete/:id', async (req, res) => {
 });
 
 // ==========================================
+// BULK ENDPOINTS for Tavlı/Balya Tel Excel Generation
+// ==========================================
+
+// Bulk endpoint for all Tavlı/Balya MM products
+app.get('/api/tavli_balya_tel_mm/bulk-all', async (req, res) => {
+  try {
+    console.log('📊 BULK: Fetching all Tavlı/Balya MM TT products for Excel generation...');
+
+    const result = await pool.query(`
+      SELECT * FROM tavli_balya_tel_mm
+      ORDER BY id ASC
+    `);
+
+    console.log(`✅ BULK: Found ${result.rows.length} Tavlı/Balya MM TT products`);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('❌ BULK: Tavlı/Balya MM TT fetch error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Bulk endpoint for all Tavlı/Balya MM recipes
+app.get('/api/tavli_balya_tel_mm_recete/bulk-all', async (req, res) => {
+  try {
+    console.log('📊 BULK: Fetching all Tavlı/Balya MM TT recipes for Excel generation...');
+
+    const result = await pool.query(`
+      SELECT * FROM tavli_balya_tel_mm_recete
+      ORDER BY mamul_kodu ASC, sira_no ASC
+    `);
+
+    console.log(`✅ BULK: Found ${result.rows.length} Tavlı/Balya MM TT recipe entries`);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('❌ BULK: Tavlı/Balya MM TT recipes fetch error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Bulk endpoint for all YM TT products (intermediate - annealed)
+app.get('/api/tavli_netsis_ym_tt/bulk-all', async (req, res) => {
+  try {
+    console.log('📊 BULK: Fetching all YM TT products for Excel generation...');
+
+    const result = await pool.query(`
+      SELECT * FROM tavli_netsis_ym_tt
+      ORDER BY id ASC
+    `);
+
+    console.log(`✅ BULK: Found ${result.rows.length} YM TT products`);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('❌ BULK: YM TT fetch error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Bulk endpoint for all YM TT recipes
+app.get('/api/tavli_netsis_ym_tt_recete/bulk-all', async (req, res) => {
+  try {
+    console.log('📊 BULK: Fetching all YM TT recipes for Excel generation...');
+
+    const result = await pool.query(`
+      SELECT * FROM tavli_netsis_ym_tt_recete
+      ORDER BY mamul_kodu ASC, priority ASC, sira_no ASC
+    `);
+
+    console.log(`✅ BULK: Found ${result.rows.length} YM TT recipe entries`);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('❌ BULK: YM TT recipes fetch error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Bulk endpoint for all YM STP products (intermediate - pressed)
+app.get('/api/tavli_netsis_ym_stp/bulk-all', async (req, res) => {
+  try {
+    console.log('📊 BULK: Fetching all YM STP products for Excel generation...');
+
+    const result = await pool.query(`
+      SELECT * FROM tavli_netsis_ym_stp
+      ORDER BY id ASC
+    `);
+
+    console.log(`✅ BULK: Found ${result.rows.length} YM STP products`);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('❌ BULK: YM STP fetch error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Bulk endpoint for all YM STP recipes
+app.get('/api/tavli_netsis_ym_stp_recete/bulk-all', async (req, res) => {
+  try {
+    console.log('📊 BULK: Fetching all YM STP recipes for Excel generation...');
+
+    const result = await pool.query(`
+      SELECT * FROM tavli_netsis_ym_stp_recete
+      ORDER BY mamul_kodu ASC, priority ASC, sira_no ASC
+    `);
+
+    console.log(`✅ BULK: Found ${result.rows.length} YM STP recipe entries`);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('❌ BULK: YM STP recipes fetch error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ==========================================
 const PORT = process.env.PORT || 4000;
 if (process.env.NODE_ENV !== 'production') {
     app.listen(PORT, () => {

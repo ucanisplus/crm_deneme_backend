@@ -783,13 +783,13 @@ const tables = [
     // Tavlı Tel / Balya Teli tabloları
     'tavli_balya_tel_mm',
     'tavli_balya_tel_mm_recete',
-    'tavli_balya_tel_mm_ym_st',
+    // 'tavli_balya_tel_mm_ym_st', // REMOVED - Not needed
     'tavli_balya_tel_sal_requests',
-    'tavli_balya_tel_sequence',
+    // 'tavli_balya_tel_sequence', // REMOVED - Not needed
     'tavli_netsis_ym_tt',
     'tavli_netsis_ym_tt_recete',
-    'tavli_netsis_ym_yb',
-    'tavli_netsis_ym_yb_recete',
+    // 'tavli_netsis_ym_yb', // REMOVED - Not needed
+    // 'tavli_netsis_ym_yb_recete', // REMOVED - Not needed
     'tavli_netsis_ym_stp',
     'tavli_netsis_ym_stp_recete',
 
@@ -4717,6 +4717,10 @@ app.delete('/api/tavli_netsis_ym_tt_recete/:id', async (req, res) => {
 // ==========================================
 // YM YB (Yagli Balya Intermediate)
 // ==========================================
+// ==========================================
+// YM YB ENDPOINTS - REMOVED (Table deleted)
+// ==========================================
+/*
 app.get('/api/tavli_netsis_ym_yb', async (req, res) => {
   try {
     const { limit = 1000, sequence, stok_kodu } = req.query;
@@ -4821,6 +4825,7 @@ app.delete('/api/tavli_netsis_ym_yb_recete/:id', async (req, res) => {
     res.json({ message: 'Deleted successfully' });
   } catch (err) { console.error('Error:', err); res.status(500).json({ error: err.message }); }
 });
+*/
 
 // ==========================================
 // YM STP (Pressed Siyah Tel)

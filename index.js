@@ -4921,6 +4921,92 @@ app.delete('/api/tavli_netsis_ym_stp_recete/:id', async (req, res) => {
 });
 
 // ==========================================
+// TAVLI/BALYA MM TT (Final Products)
+// ==========================================
+app.get('/api/tavli_balya_tel_mm', async (req, res) => {
+  try {
+    const { limit = 1000, stok_kodu, product_type } = req.query;
+    let query = 'SELECT * FROM tavli_balya_tel_mm WHERE 1=1';
+    const params = [];
+    if (stok_kodu) { params.push(stok_kodu); query += ` AND stok_kodu = $${params.length}`; }
+    if (product_type) { params.push(product_type); query += ` AND product_type = $${params.length}`; }
+    query += ' ORDER BY created_at DESC';
+    if (limit) { params.push(limit); query += ` LIMIT $${params.length}`; }
+    const result = await pool.query(query, params);
+    res.json(result.rows);
+  } catch (err) { console.error('Error:', err); res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/tavli_balya_tel_mm', async (req, res) => {
+  try {
+    const data = req.body;
+    const fields = Object.keys(data).filter(k => k !== 'id' && k !== 'created_at' && k !== 'updated_at');
+    const values = fields.map(k => data[k]);
+    const placeholders = fields.map((_, i) => `$${i + 1}`).join(', ');
+    const result = await pool.query(
+      `INSERT INTO tavli_balya_tel_mm (${fields.join(', ')}) VALUES (${placeholders}) RETURNING *`,
+      values
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) { console.error('Error:', err); res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/tavli_balya_tel_mm/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    // First delete related recipes
+    await pool.query(`
+      DELETE FROM tavli_balya_tel_mm_recete
+      WHERE mamul_kodu IN (SELECT stok_kodu FROM tavli_balya_tel_mm WHERE id = $1)
+    `, [id]);
+    // Then delete the product
+    const result = await pool.query('DELETE FROM tavli_balya_tel_mm WHERE id = $1 RETURNING *', [id]);
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Not found' });
+    res.json({ message: 'Deleted successfully', deleted: result.rows[0] });
+  } catch (err) { console.error('Error:', err); res.status(500).json({ error: err.message }); }
+});
+
+// ==========================================
+// TAVLI/BALYA MM TT RECETE (Recipes)
+// ==========================================
+app.get('/api/tavli_balya_tel_mm_recete', async (req, res) => {
+  try {
+    const { mamul_kodu } = req.query;
+    let query = 'SELECT * FROM tavli_balya_tel_mm_recete';
+    const params = [];
+    if (mamul_kodu) {
+      query += ' WHERE mamul_kodu = $1';
+      params.push(mamul_kodu);
+    }
+    query += ' ORDER BY mamul_kodu ASC, sira_no ASC';
+    const result = await pool.query(query, params);
+    res.json(result.rows);
+  } catch (err) { console.error('Error:', err); res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/tavli_balya_tel_mm_recete', async (req, res) => {
+  try {
+    const data = req.body;
+    const fields = Object.keys(data).filter(k => k !== 'id' && k !== 'created_at' && k !== 'updated_at');
+    const values = fields.map(k => data[k]);
+    const placeholders = fields.map((_, i) => `$${i + 1}`).join(', ');
+    const result = await pool.query(
+      `INSERT INTO tavli_balya_tel_mm_recete (${fields.join(', ')}) VALUES (${placeholders}) RETURNING *`,
+      values
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) { console.error('Error:', err); res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/tavli_balya_tel_mm_recete/:id', async (req, res) => {
+  try {
+    const result = await pool.query('DELETE FROM tavli_balya_tel_mm_recete WHERE id = $1 RETURNING *', [req.params.id]);
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Not found' });
+    res.json({ message: 'Deleted successfully' });
+  } catch (err) { console.error('Error:', err); res.status(500).json({ error: err.message }); }
+});
+
+// ==========================================
 // BULK ENDPOINTS for Tavlı/Balya Tel Excel Generation
 // ==========================================
 

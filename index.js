@@ -2269,6 +2269,13 @@ for (const table of tables) {
                   console.log(`✅ Removed uretim_suresi field for tavli_netsis_ym_stp_recete`);
                 }
 
+                // ✅ FIX: Rename recete_toplama to recete_top for gal_cost_cal_ym_st_recete
+                if (table === 'gal_cost_cal_ym_st_recete' && data.recete_toplama !== undefined) {
+                  data.recete_top = data.recete_toplama;
+                  delete data.recete_toplama;
+                  console.log(`✅ Renamed recete_toplama → recete_top for gal_cost_cal_ym_st_recete`);
+                }
+
                 const columns = Object.keys(data).join(', ');
                 const placeholders = Object.keys(data).map((_, index) => `$${index + 1}`).join(', ');
                 const values = Object.values(data);

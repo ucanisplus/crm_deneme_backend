@@ -2231,12 +2231,44 @@ for (const table of tables) {
             } else {
                 // Sayı değerlerini normalize et (virgülleri noktalara çevir)
                 data = normalizeData(data);
-                
+
                 // Veri onaylandıktan sonra boş olabilir mi kontrol et
                 if (!data || Object.keys(data).length === 0) {
                   return res.status(400).json({ error: 'Normalleştirmeden sonra boş veri kaldı' });
                 }
-                
+
+                // ✅ FIX: Convert ym_st_stok_kodu to ym_st_id for gal_cost_cal_ym_st_recete
+                if (table === 'gal_cost_cal_ym_st_recete' && data.ym_st_stok_kodu) {
+                  try {
+                    const ymStLookup = await pool.query(
+                      'SELECT id FROM gal_cost_cal_ym_st WHERE stok_kodu = $1 LIMIT 1',
+                      [data.ym_st_stok_kodu]
+                    );
+                    if (ymStLookup.rows.length > 0) {
+                      data.ym_st_id = ymStLookup.rows[0].id;
+                      delete data.ym_st_stok_kodu; // Remove the invalid field
+                      console.log(`✅ Converted ym_st_stok_kodu to ym_st_id: ${data.ym_st_id}`);
+                    } else {
+                      return res.status(400).json({
+                        error: 'YM ST product not found',
+                        details: `No YM ST found with stok_kodu: ${data.ym_st_stok_kodu}`
+                      });
+                    }
+                  } catch (lookupError) {
+                    console.error('❌ YM ST lookup error:', lookupError);
+                    return res.status(500).json({
+                      error: 'Failed to lookup YM ST ID',
+                      details: lookupError.message
+                    });
+                  }
+                }
+
+                // ✅ FIX: Remove uretim_suresi from tavli_netsis_ym_stp_recete (column doesn't exist)
+                if (table === 'tavli_netsis_ym_stp_recete' && data.uretim_suresi !== undefined) {
+                  delete data.uretim_suresi;
+                  console.log(`✅ Removed uretim_suresi field for tavli_netsis_ym_stp_recete`);
+                }
+
                 const columns = Object.keys(data).join(', ');
                 const placeholders = Object.keys(data).map((_, index) => `$${index + 1}`).join(', ');
                 const values = Object.values(data);
@@ -3825,6 +3857,46 @@ app.get('/api/gal_cost_cal_ym_st_recete/bulk-all', async (req, res) => {
     res.json(result.rows);
   } catch (error) {
     console.error('❌ BULK: YM ST recipe fetch error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ✅ NEW: Bulk delete endpoint for YM ST recipes by stok_kodu
+app.delete('/api/gal_cost_cal_ym_st_recete/bulk/:stok_kodu', async (req, res) => {
+  try {
+    const { stok_kodu } = req.params;
+    console.log(`🗑️ BULK DELETE: Deleting YM ST recipes for stok_kodu: ${stok_kodu}`);
+
+    // First, look up the ym_st_id from stok_kodu
+    const ymStLookup = await pool.query(
+      'SELECT id FROM gal_cost_cal_ym_st WHERE stok_kodu = $1',
+      [stok_kodu]
+    );
+
+    if (ymStLookup.rows.length === 0) {
+      return res.status(404).json({
+        error: 'YM ST product not found',
+        details: `No YM ST found with stok_kodu: ${stok_kodu}`
+      });
+    }
+
+    const ymStId = ymStLookup.rows[0].id;
+
+    // Delete all recipes for this ym_st_id
+    const result = await pool.query(
+      'DELETE FROM gal_cost_cal_ym_st_recete WHERE ym_st_id = $1',
+      [ymStId]
+    );
+
+    console.log(`✅ BULK DELETE: Deleted ${result.rowCount} YM ST recipes for ${stok_kodu}`);
+    res.json({
+      message: 'Bulk delete successful',
+      deletedCount: result.rowCount,
+      stok_kodu: stok_kodu,
+      ym_st_id: ymStId
+    });
+  } catch (error) {
+    console.error('❌ BULK DELETE error:', error);
     res.status(500).json({ error: error.message });
   }
 });

@@ -98,7 +98,7 @@ const pool = new Pool({
     connectionTimeoutMillis: 5000  // Fail fast if can't connect (5s)
 });
 
-// 🧹 Database Connection Cleanup Function
+// 🧹 AGGRESSIVE Database Connection Cleanup Function (for serverless)
 const cleanupIdleConnections = async () => {
   try {
     const result = await pool.query(`
@@ -107,7 +107,7 @@ const cleanupIdleConnections = async () => {
       WHERE datname = current_database()
         AND pid <> pg_backend_pid()
         AND state = 'idle'
-        AND state_change < now() - interval '5 minutes'
+        AND state_change < now() - interval '30 seconds'
         AND usename NOT IN (
           SELECT rolname FROM pg_roles WHERE rolsuper = true
         )
@@ -123,12 +123,35 @@ const cleanupIdleConnections = async () => {
   }
 };
 
+// ⚡ Emergency cleanup for "max connections" errors
+const emergencyCleanup = async () => {
+  try {
+    console.log('🚨 EMERGENCY: Cleaning ALL idle connections immediately');
+    const result = await pool.query(`
+      SELECT pg_terminate_backend(pid)
+      FROM pg_stat_activity
+      WHERE datname = current_database()
+        AND pid <> pg_backend_pid()
+        AND state = 'idle'
+        AND usename NOT IN (
+          SELECT rolname FROM pg_roles WHERE rolsuper = true
+        )
+    `);
+    const terminatedCount = result.rows.filter(r => r.pg_terminate_backend === true).length;
+    console.log(`🚨 Emergency cleanup: terminated ${terminatedCount} connections`);
+    return terminatedCount;
+  } catch (error) {
+    console.error('❌ Emergency cleanup failed:', error.message);
+    return 0;
+  }
+};
+
 // Run cleanup once on startup
 cleanupIdleConnections();
 
-// Schedule cleanup every 10 minutes
-setInterval(cleanupIdleConnections, 10 * 60 * 1000);
-console.log('🧹 Database connection cleanup scheduled (every 10 minutes)');
+// Schedule aggressive cleanup every 1 minute (for serverless heavy load)
+setInterval(cleanupIdleConnections, 60 * 1000);
+console.log('🧹 AGGRESSIVE Database connection cleanup scheduled (every 60 seconds)');
 
 // Redis Configuration for Caching
 let redis;
@@ -4695,15 +4718,36 @@ app.get('/api/tavli_netsis_ym_tt_recete', async (req, res) => {
 });
 
 app.post('/api/tavli_netsis_ym_tt_recete', async (req, res) => {
-  try {
-    const {ym_tt_stok_kodu, mamul_kodu, recete_toplama, bilesen_kodu, operasyon_bilesen, miktar, olcu_br, olcu_br_bilesen, ua_dahil_edilsin, son_operasyon, sira_no, aciklama, fire_orani, oto_rec} = req.body;
-    const result = await pool.query(
-      `INSERT INTO tavli_netsis_ym_tt_recete (ym_tt_stok_kodu, mamul_kodu, recete_toplama, bilesen_kodu, operasyon_bilesen, miktar, olcu_br, olcu_br_bilesen, ua_dahil_edilsin, son_operasyon, sira_no, aciklama, fire_orani, oto_rec)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING *`,
-      [ym_tt_stok_kodu, mamul_kodu, recete_toplama, bilesen_kodu, operasyon_bilesen, miktar, olcu_br, olcu_br_bilesen, ua_dahil_edilsin, son_operasyon, sira_no, aciklama, fire_orani || 0, oto_rec]
-    );
-    res.status(201).json(result.rows[0]);
-  } catch (err) { console.error('Error:', err); res.status(500).json({ error: err.message }); }
+  let retryCount = 0;
+  const maxRetries = 2;
+
+  while (retryCount <= maxRetries) {
+    try {
+      const {ym_tt_stok_kodu, mamul_kodu, recete_toplama, bilesen_kodu, operasyon_bilesen, miktar, olcu_br, olcu_br_bilesen, ua_dahil_edilsin, son_operasyon, sira_no, aciklama, fire_orani, oto_rec} = req.body;
+      const result = await pool.query(
+        `INSERT INTO tavli_netsis_ym_tt_recete (ym_tt_stok_kodu, mamul_kodu, recete_toplama, bilesen_kodu, operasyon_bilesen, miktar, olcu_br, olcu_br_bilesen, ua_dahil_edilsin, son_operasyon, sira_no, aciklama, fire_orani, oto_rec)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING *`,
+        [ym_tt_stok_kodu, mamul_kodu, recete_toplama, bilesen_kodu, operasyon_bilesen, miktar, olcu_br, olcu_br_bilesen, ua_dahil_edilsin, son_operasyon, sira_no, aciklama, fire_orani || 0, oto_rec]
+      );
+      res.status(201).json(result.rows[0]);
+      return; // Success
+    } catch (err) {
+      console.error('❌ YM TT recipe save error:', err.message);
+
+      // Check if it's a max connections error
+      if (err.message && err.message.includes('Max client connections reached') && retryCount < maxRetries) {
+        console.log(`🚨 Max connections error detected, triggering emergency cleanup (attempt ${retryCount + 1}/${maxRetries + 1})`);
+        await emergencyCleanup();
+        await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
+        retryCount++;
+        continue; // Retry
+      }
+
+      // For other errors or max retries reached, return error
+      res.status(500).json({ error: err.message });
+      return;
+    }
+  }
 });
 
 app.delete('/api/tavli_netsis_ym_tt_recete/:id', async (req, res) => {
@@ -4901,15 +4945,36 @@ app.get('/api/tavli_netsis_ym_stp_recete', async (req, res) => {
 });
 
 app.post('/api/tavli_netsis_ym_stp_recete', async (req, res) => {
-  try {
-    const {ym_stp_stok_kodu, mamul_kodu, recete_toplama, bilesen_kodu, operasyon_bilesen, miktar, olcu_br, olcu_br_bilesen, ua_dahil_edilsin, son_operasyon, sira_no, aciklama, fire_orani, oto_rec} = req.body;
-    const result = await pool.query(
-      `INSERT INTO tavli_netsis_ym_stp_recete (ym_stp_stok_kodu, mamul_kodu, recete_toplama, bilesen_kodu, operasyon_bilesen, miktar, olcu_br, olcu_br_bilesen, ua_dahil_edilsin, son_operasyon, sira_no, aciklama, fire_orani, oto_rec)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING *`,
-      [ym_stp_stok_kodu, mamul_kodu, recete_toplama, bilesen_kodu, operasyon_bilesen, miktar, olcu_br, olcu_br_bilesen, ua_dahil_edilsin, son_operasyon, sira_no, aciklama, fire_orani || 0, oto_rec]
-    );
-    res.status(201).json(result.rows[0]);
-  } catch (err) { console.error('Error:', err); res.status(500).json({ error: err.message }); }
+  let retryCount = 0;
+  const maxRetries = 2;
+
+  while (retryCount <= maxRetries) {
+    try {
+      const {ym_stp_stok_kodu, mamul_kodu, recete_toplama, bilesen_kodu, operasyon_bilesen, miktar, olcu_br, olcu_br_bilesen, ua_dahil_edilsin, son_operasyon, sira_no, aciklama, fire_orani, oto_rec} = req.body;
+      const result = await pool.query(
+        `INSERT INTO tavli_netsis_ym_stp_recete (ym_stp_stok_kodu, mamul_kodu, recete_toplama, bilesen_kodu, operasyon_bilesen, miktar, olcu_br, olcu_br_bilesen, ua_dahil_edilsin, son_operasyon, sira_no, aciklama, fire_orani, oto_rec)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING *`,
+        [ym_stp_stok_kodu, mamul_kodu, recete_toplama, bilesen_kodu, operasyon_bilesen, miktar, olcu_br, olcu_br_bilesen, ua_dahil_edilsin, son_operasyon, sira_no, aciklama, fire_orani || 0, oto_rec]
+      );
+      res.status(201).json(result.rows[0]);
+      return; // Success
+    } catch (err) {
+      console.error('❌ YM STP recipe save error:', err.message);
+
+      // Check if it's a max connections error
+      if (err.message && err.message.includes('Max client connections reached') && retryCount < maxRetries) {
+        console.log(`🚨 Max connections error detected, triggering emergency cleanup (attempt ${retryCount + 1}/${maxRetries + 1})`);
+        await emergencyCleanup();
+        await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
+        retryCount++;
+        continue; // Retry
+      }
+
+      // For other errors or max retries reached, return error
+      res.status(500).json({ error: err.message });
+      return;
+    }
+  }
 });
 
 app.delete('/api/tavli_netsis_ym_stp_recete/:id', async (req, res) => {
@@ -4991,17 +5056,44 @@ app.get('/api/tavli_balya_tel_mm_recete', async (req, res) => {
 });
 
 app.post('/api/tavli_balya_tel_mm_recete', async (req, res) => {
-  try {
-    const data = req.body;
-    const fields = Object.keys(data).filter(k => k !== 'id' && k !== 'created_at' && k !== 'updated_at');
-    const values = fields.map(k => data[k]);
-    const placeholders = fields.map((_, i) => `$${i + 1}`).join(', ');
-    const result = await pool.query(
-      `INSERT INTO tavli_balya_tel_mm_recete (${fields.join(', ')}) VALUES (${placeholders}) RETURNING *`,
-      values
-    );
-    res.status(201).json(result.rows[0]);
-  } catch (err) { console.error('Error:', err); res.status(500).json({ error: err.message }); }
+  let retryCount = 0;
+  const maxRetries = 2;
+
+  while (retryCount <= maxRetries) {
+    try {
+      const data = req.body;
+      const fields = Object.keys(data).filter(k => k !== 'id' && k !== 'created_at' && k !== 'updated_at');
+      const values = fields.map(k => data[k]);
+      const placeholders = fields.map((_, i) => `$${i + 1}`).join(', ');
+      const result = await pool.query(
+        `INSERT INTO tavli_balya_tel_mm_recete (${fields.join(', ')}) VALUES (${placeholders}) RETURNING *`,
+        values
+      );
+      res.status(201).json(result.rows[0]);
+      return; // Success, exit
+    } catch (err) {
+      console.error('❌ Recipe save error:', err.message);
+
+      // Check if it's a max connections error
+      if (err.message && err.message.includes('Max client connections reached') && retryCount < maxRetries) {
+        console.log(`🚨 Max connections error detected, triggering emergency cleanup (attempt ${retryCount + 1}/${maxRetries + 1})`);
+        await emergencyCleanup();
+        await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
+        retryCount++;
+        continue; // Retry
+      }
+
+      // For other errors or max retries reached, return error
+      const errorDetails = err.message.includes('Max client connections')
+        ? 'Max client connections reached'
+        : err.message;
+      res.status(500).json({
+        error: 'Reçete eklenirken bir hata oluştu',
+        details: errorDetails
+      });
+      return;
+    }
+  }
 });
 
 app.delete('/api/tavli_balya_tel_mm_recete/:id', async (req, res) => {

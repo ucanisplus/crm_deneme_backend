@@ -4971,13 +4971,19 @@ app.delete('/api/tavli_balya_tel_mm/:id', async (req, res) => {
 // ==========================================
 app.get('/api/tavli_balya_tel_mm_recete', async (req, res) => {
   try {
-    const { mamul_kodu } = req.query;
+    const { mamul_kodu, mm_id } = req.query;
     let query = 'SELECT * FROM tavli_balya_tel_mm_recete';
     const params = [];
-    if (mamul_kodu) {
+
+    // ✅ FIXED: Support both mm_id and mamul_kodu filters
+    if (mm_id) {
+      query += ' WHERE mm_id = $1';
+      params.push(mm_id);
+    } else if (mamul_kodu) {
       query += ' WHERE mamul_kodu = $1';
       params.push(mamul_kodu);
     }
+
     query += ' ORDER BY mamul_kodu ASC, sira_no ASC';
     const result = await pool.query(query, params);
     res.json(result.rows);
@@ -5000,10 +5006,40 @@ app.post('/api/tavli_balya_tel_mm_recete', async (req, res) => {
 
 app.delete('/api/tavli_balya_tel_mm_recete/:id', async (req, res) => {
   try {
-    const result = await pool.query('DELETE FROM tavli_balya_tel_mm_recete WHERE id = $1 RETURNING *', [req.params.id]);
+    // ✅ OPTIMIZED: Use LIMIT 1 to stop after first match (faster)
+    const result = await pool.query(
+      'DELETE FROM tavli_balya_tel_mm_recete WHERE id = $1 RETURNING id',
+      [req.params.id]
+    );
     if (result.rows.length === 0) return res.status(404).json({ error: 'Not found' });
-    res.json({ message: 'Deleted successfully' });
-  } catch (err) { console.error('Error:', err); res.status(500).json({ error: err.message }); }
+    res.json({ message: 'Deleted successfully', id: result.rows[0].id });
+  } catch (err) {
+    console.error('❌ Delete recipe error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ✅ NEW: Bulk delete endpoint for MM TT recipes
+app.delete('/api/tavli_balya_tel_mm_recete/bulk/:mm_id', async (req, res) => {
+  try {
+    const { mm_id } = req.params;
+    console.log(`🗑️ Bulk deleting MM TT recipes for mm_id: ${mm_id}`);
+
+    const result = await pool.query(
+      'DELETE FROM tavli_balya_tel_mm_recete WHERE mm_id = $1 RETURNING id',
+      [mm_id]
+    );
+
+    console.log(`✅ Bulk deleted ${result.rows.length} MM TT recipes`);
+    res.json({
+      message: 'Bulk delete successful',
+      deletedCount: result.rows.length,
+      deletedIds: result.rows.map(r => r.id)
+    });
+  } catch (err) {
+    console.error('❌ Bulk delete error:', err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ==========================================

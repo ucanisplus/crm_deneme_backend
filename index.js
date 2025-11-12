@@ -88,14 +88,14 @@ app.use((req, res, next) => {
   next();
 });
 
-// PostgreSQL Bağlantısı - OPTIMIZED CONFIGURATION
+// PostgreSQL Bağlantısı - SERVERLESS OPTIMIZED (Vercel + Supabase)
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
     ssl: { rejectUnauthorized: false },
-    // Keep original connection pool settings that worked
-    max: 20,
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 10000
+    // ✅ FIXED: Serverless-friendly settings for Vercel
+    max: 1,                        // Minimal connections for serverless
+    idleTimeoutMillis: 5000,       // Close idle connections quickly (5s)
+    connectionTimeoutMillis: 5000  // Fail fast if can't connect (5s)
 });
 
 // 🧹 Database Connection Cleanup Function

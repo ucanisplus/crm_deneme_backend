@@ -2693,22 +2693,48 @@ async function deleteRelatedRecords(table, id) {
         console.log(`⚠️ YM GT reçeteleri silinirken hata:`, error.message);
       }
     }
-    
-    // ⚠️ DISABLED: CASCADE DELETE for YM ST recipes
-    // This was causing MASSIVE data loss - deleting ONE product would delete ALL its recipes
-    // User accidentally deleted 1,079 recipes on 2025-11-12 because of this
-    // If you need to delete recipes, do it manually or add a confirmation dialog
-    /*
+
+    // ✅ RE-ENABLED: CASCADE DELETE for YM ST (now with frontend confirmation dialog)
+    // Deleting YM ST should cascade delete:
+    // - YM ST recipes
+    // - YM STP stock + recipes (if exists)
     if (table === 'gal_cost_cal_ym_st') {
       try {
-        const deletedRecipes = await pool.query('DELETE FROM gal_cost_cal_ym_st_recete WHERE ym_st_id = $1', [id]);
-        console.log(`✅ YM ST reçeteleri silindi: ${deletedRecipes.rowCount}`);
+        // Get YM ST stock code first
+        const ymStResult = await pool.query('SELECT stok_kodu FROM gal_cost_cal_ym_st WHERE id = $1', [id]);
+        if (ymStResult.rows.length > 0) {
+          const ymStStokKodu = ymStResult.rows[0].stok_kodu;
+          console.log(`🗑️ Cascading delete for YM ST: ${ymStStokKodu}`);
+
+          // 1. Delete YM ST recipes
+          const deletedRecipes = await pool.query('DELETE FROM gal_cost_cal_ym_st_recete WHERE ym_st_id = $1', [id]);
+          console.log(`✅ YM ST recipes deleted: ${deletedRecipes.rowCount}`);
+
+          // 2. Delete YM STP if exists (YM STP format: YM.ST.XXXX.YYYY.ZZZZ.P)
+          // YM STP is created from YM ST by adding .P suffix
+          const ymStpStokKodu = `${ymStStokKodu}.P`;
+          const ymStpResult = await pool.query('SELECT id FROM tavli_netsis_ym_stp WHERE stok_kodu = $1', [ymStpStokKodu]);
+
+          if (ymStpResult.rows.length > 0) {
+            const ymStpId = ymStpResult.rows[0].id;
+            console.log(`🗑️ Found YM STP to delete: ${ymStpStokKodu}`);
+
+            // Delete YM STP recipes first
+            const deletedStpRecipes = await pool.query('DELETE FROM tavli_netsis_ym_stp_recete WHERE mamul_kodu = $1', [ymStpStokKodu]);
+            console.log(`✅ YM STP recipes deleted: ${deletedStpRecipes.rowCount}`);
+
+            // Delete YM STP stock
+            await pool.query('DELETE FROM tavli_netsis_ym_stp WHERE id = $1', [ymStpId]);
+            console.log(`✅ YM STP deleted: ${ymStpStokKodu}`);
+          } else {
+            console.log(`ℹ️ No YM STP found for ${ymStStokKodu} (no pressing needed)`);
+          }
+        }
       } catch (error) {
-        console.log(`⚠️ YM ST reçeteleri silinirken hata:`, error.message);
+        console.log(`⚠️ YM ST cascade delete error:`, error.message);
       }
     }
-    */
-    
+
     // Çelik Hasır MM siliniyorsa, ilişkili reçeteleri sil
     if (table === 'celik_hasir_netsis_mm') {
       try {

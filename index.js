@@ -2276,6 +2276,25 @@ for (const table of tables) {
                   console.log(`✅ Renamed recete_toplama → recete_top for gal_cost_cal_ym_st_recete`);
                 }
 
+                // ✅ FIX: Default ozel_saha fields to 0/"" for gal_cost_cal_ym_st
+                if (table === 'gal_cost_cal_ym_st') {
+                  // Default numeric ozel_saha fields to 0 if not provided
+                  for (let i = 2; i <= 8; i++) {
+                    const fieldName = `ozel_saha_${i}_say`;
+                    if (data[fieldName] === undefined || data[fieldName] === null || data[fieldName] === '') {
+                      data[fieldName] = 0;
+                    }
+                  }
+                  // Default alphanumeric ozel_saha fields to "" if not provided
+                  for (let i = 1; i <= 8; i++) {
+                    const fieldName = `ozel_saha_${i}_alf`;
+                    if (data[fieldName] === undefined || data[fieldName] === null) {
+                      data[fieldName] = "";
+                    }
+                  }
+                  console.log(`✅ Defaulted ozel_saha fields for gal_cost_cal_ym_st`);
+                }
+
                 const columns = Object.keys(data).join(', ');
                 const placeholders = Object.keys(data).map((_, index) => `$${index + 1}`).join(', ');
                 const values = Object.values(data);
@@ -2675,7 +2694,11 @@ async function deleteRelatedRecords(table, id) {
       }
     }
     
-    // YM ST siliniyorsa, ilişkili reçeteleri sil
+    // ⚠️ DISABLED: CASCADE DELETE for YM ST recipes
+    // This was causing MASSIVE data loss - deleting ONE product would delete ALL its recipes
+    // User accidentally deleted 1,079 recipes on 2025-11-12 because of this
+    // If you need to delete recipes, do it manually or add a confirmation dialog
+    /*
     if (table === 'gal_cost_cal_ym_st') {
       try {
         const deletedRecipes = await pool.query('DELETE FROM gal_cost_cal_ym_st_recete WHERE ym_st_id = $1', [id]);
@@ -2684,6 +2707,7 @@ async function deleteRelatedRecords(table, id) {
         console.log(`⚠️ YM ST reçeteleri silinirken hata:`, error.message);
       }
     }
+    */
     
     // Çelik Hasır MM siliniyorsa, ilişkili reçeteleri sil
     if (table === 'celik_hasir_netsis_mm') {

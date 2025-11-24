@@ -4764,6 +4764,10 @@ app.get('/api/celik-hasir-planlama/export/:sessionId', async (req, res) => {
 app.get('/api/tavli_netsis_ym_tt', async (req, res) => {
   try {
     const { limit = 1000, sequence, stok_kodu, source_mm_stok_kodu } = req.query;
+
+    // DEBUG: Log what we received
+    console.log('YM TT GET - Query params:', { sequence, stok_kodu, source_mm_stok_kodu, limit });
+
     let query = 'SELECT * FROM tavli_netsis_ym_tt WHERE 1=1';
     const params = [];
     if (sequence) { params.push(sequence); query += ` AND sequence = $${params.length}`; }
@@ -4771,7 +4775,16 @@ app.get('/api/tavli_netsis_ym_tt', async (req, res) => {
     if (source_mm_stok_kodu) { params.push(source_mm_stok_kodu); query += ` AND source_mm_stok_kodu = $${params.length}`; }
     query += ' ORDER BY created_at DESC';
     if (limit) { params.push(limit); query += ` LIMIT $${params.length}`; }
+
+    // DEBUG: Log final query and params
+    console.log('YM TT GET - SQL:', query);
+    console.log('YM TT GET - Params:', params);
+
     const result = await pool.query(query, params);
+
+    // DEBUG: Log result count
+    console.log('YM TT GET - Returned rows:', result.rows.length);
+
     res.json(result.rows);
   } catch (err) { console.error('Error:', err); res.status(500).json({ error: err.message }); }
 });

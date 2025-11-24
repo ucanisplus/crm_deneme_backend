@@ -4762,11 +4762,15 @@ app.get('/api/celik-hasir-planlama/export/:sessionId', async (req, res) => {
 // ==========================================
 app.get('/api/tavli_netsis_ym_tt', async (req, res) => {
   try {
-    const { limit = 1000, sequence, stok_kodu } = req.query;
+    const { limit = 1000, sequence, stok_kodu, source_mm_stok_kodu } = req.query;
     let query = 'SELECT * FROM tavli_netsis_ym_tt WHERE 1=1';
     const params = [];
     if (sequence) { params.push(sequence); query += ` AND sequence = $${params.length}`; }
     if (stok_kodu) { params.push(stok_kodu); query += ` AND stok_kodu = $${params.length}`; }
+    if (source_mm_stok_kodu && source_mm_stok_kodu.trim() !== '') {
+      params.push(source_mm_stok_kodu);
+      query += ` AND source_mm_stok_kodu = $${params.length}`;
+    }
     query += ' ORDER BY created_at DESC';
     if (limit) { params.push(limit); query += ` LIMIT $${params.length}`; }
     const result = await pool.query(query, params);

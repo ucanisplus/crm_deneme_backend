@@ -4765,6 +4765,10 @@ app.get('/api/tavli_netsis_ym_tt', async (req, res) => {
   try {
     const { limit = 1000, sequence, stok_kodu, source_mm_stok_kodu } = req.query;
 
+    // DEBUG: Add response headers to see what was received
+    res.setHeader('X-Debug-Source-Param', source_mm_stok_kodu || 'UNDEFINED');
+    res.setHeader('X-Debug-Timestamp', new Date().toISOString());
+
     // Build the SQL query with proper filtering
     let query = 'SELECT * FROM tavli_netsis_ym_tt WHERE 1=1';
     const params = [];
@@ -4791,6 +4795,10 @@ app.get('/api/tavli_netsis_ym_tt', async (req, res) => {
     }
 
     const result = await pool.query(query, params);
+
+    // DEBUG: Add header showing row count
+    res.setHeader('X-Debug-Row-Count', result.rows.length.toString());
+
     res.json(result.rows);
   } catch (err) { console.error('Error:', err); res.status(500).json({ error: err.message }); }
 });

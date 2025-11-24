@@ -5386,3 +5386,4 @@ if (process.env.NODE_ENV !== 'production') {
 
 // Vercel için dışa aktar
 module.exports = app;
+// Force redeploy Mon Nov 24 12:11:04 +03 2025

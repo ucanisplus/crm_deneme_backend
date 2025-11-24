@@ -4758,7 +4758,8 @@ app.get('/api/celik-hasir-planlama/export/:sessionId', async (req, res) => {
 // ═══════════════════════════════════════════════════════════════
 
 // ==========================================
-// YM TT (Tavli Tel Intermediate)
+// YM TT (Tavli Tel Intermediate) - Nov 24, 2025
+// Supports filtering by source_mm_stok_kodu for 1:1 MM TT -> YM TT relationship
 // ==========================================
 app.get('/api/tavli_netsis_ym_tt', async (req, res) => {
   try {

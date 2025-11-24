@@ -4760,8 +4760,9 @@ app.get('/api/celik-hasir-planlama/export/:sessionId', async (req, res) => {
 // ==========================================
 // YM TT (Tavli Tel Intermediate) - Nov 24, 2025
 // Supports filtering by source_mm_stok_kodu for 1:1 MM TT -> YM TT relationship
+// V2: New endpoint to bypass Vercel caching
 // ==========================================
-app.get('/api/tavli_netsis_ym_tt', async (req, res) => {
+app.get('/api/tavli_netsis_ym_tt_v2', async (req, res) => {
   try {
     const { limit = 1000, sequence, stok_kodu, source_mm_stok_kodu } = req.query;
 

@@ -33,7 +33,7 @@ app.use((req, res, next) => {
 app.options('*', cors());
 app.use(express.json({ limit: '10mb' }));
 
-// JSON parse error handling
+// JSON parse Hata handling
 app.use((err, req, res, next) => {
   if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
     console.error('JSON Parse Error:', err.message);
@@ -74,7 +74,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// PostgreSQL Connection - Same as Vercel backend
+// PostgreSQL Bağlantı - Same as Vercel backend
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
     ssl: { rejectUnauthorized: false },
@@ -164,7 +164,7 @@ const cacheHelpers = {
   }
 };
 
-// Database error handling
+// Veritabanı Hata handling
 pool.on('error', (err) => {
   console.error('Unexpected database error:', err);
 });
@@ -213,7 +213,7 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Test database connection
+// Test Veritabanı Bağlantı
 app.get('/api/test-db', async (req, res) => {
   try {
     const result = await pool.query('SELECT NOW() as current_time');

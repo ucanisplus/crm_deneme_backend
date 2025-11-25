@@ -14,7 +14,7 @@ async function testRecipeFilter() {
 
     console.log(`1. Testing with existing product: ${testStokKodu}`);
 
-    // Simulate the backend query logic EXACTLY
+    // Simulate the backend Sorgu logic EXACTLY
     const ym_tt_stok_kodu = testStokKodu;
     const mamul_kodu = undefined;
     const limit = 2000;
@@ -51,7 +51,7 @@ async function testRecipeFilter() {
       console.log(`  Last recipe: ${result.rows[result.rows.length-1].mamul_kodu}`);
     }
 
-    // Test 2: Without filter (should return all)
+    // Test 2: Without Filtre (should return all)
     console.log(`\n2. Testing WITHOUT filter (should return all ~82 recipes):`);
     const allResult = await pool.query('SELECT COUNT(*) FROM tavli_netsis_ym_tt_recete');
     console.log(`✓ Total recipes in database: ${allResult.rows[0].count}`);

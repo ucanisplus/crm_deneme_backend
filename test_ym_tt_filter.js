@@ -1,6 +1,6 @@
 const { Pool } = require('pg');
 
-// Database connection
+// Veritabanı Bağlantı
 const pool = new Pool({
   connectionString: 'postgresql://galvaniz_db_user:q7Ik8xHISvIEfaeT@dpg-csjh96lds78s73fgejd0-a.oregon-postgres.render.com/galvaniz_db',
   ssl: { rejectUnauthorized: false }
@@ -14,11 +14,11 @@ async function testFilter() {
     const allCount = await pool.query('SELECT COUNT(*) FROM tavli_netsis_ym_tt');
     console.log(`1. Total YM TT products in database: ${allCount.rows[0].count}`);
 
-    // Test 2: WITHOUT filter (OLD BEHAVIOR - returns all products)
+    // Test 2: WITHOUT Filtre (OLD BEHAVIOR - returns all products)
     const withoutFilter = await pool.query('SELECT * FROM tavli_netsis_ym_tt WHERE 1=1 ORDER BY created_at DESC');
     console.log(`2. WITHOUT source_mm_stok_kodu filter: ${withoutFilter.rows.length} products returned`);
 
-    // Test 3: WITH filter for TT.BAG.0170.00 (NEW BEHAVIOR - should return only 1)
+    // Test 3: WITH Filtre for TT.BAG.0170.00 (NEW BEHAVIOR - should return only 1)
     const testStokKodu = 'TT.BAG.0170.00';
     const withFilter = await pool.query(
       'SELECT * FROM tavli_netsis_ym_tt WHERE source_mm_stok_kodu = $1',

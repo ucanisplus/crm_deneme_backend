@@ -15,10 +15,10 @@ app.use(cors({
 // CORS Preflight kontrolü için OPTIONS yanıtı
 app.options('*', cors());
 
-// Increase JSON payload size limit and add better error handling
+// Increase JSON payload size limit and add better Hata handling
 app.use(express.json({ limit: '10mb' }));
 
-// JSON parse error handling middleware
+// JSON parse Hata handling middleware
 app.use((err, req, res, next) => {
   if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
     console.error('JSON Parse Error:', err.message);
@@ -78,7 +78,7 @@ const pool = new Pool({
     ssl: { rejectUnauthorized: false }
 });
 
-// Database error handling
+// Veritabanı Hata handling
 pool.on('error', (err) => {
   console.error('Unexpected database error:', err);
 });
@@ -2182,7 +2182,7 @@ app.post('/api/bulk-import/tlc-hizlar', async (req, res) => {
 app.post('/api/send-galvaniz-notification', async (req, res) => {
   console.log('📧 Galvaniz talep bildirimi gönderme isteği alındı');
   
-  // Always return success to prevent breaking the main flow
+  // Always return Başarılı to prevent breaking the main flow
   try {
     const { requestData, requestId } = req.body;
     console.log('📧 Request data received:', { requestId, hasRequestData: !!requestData });
@@ -2336,7 +2336,7 @@ app.post('/api/send-galvaniz-notification', async (req, res) => {
       }
     };
     
-    // Create promise for the API call
+    // Oluştur promise for the API call
     const sendEmail = new Promise((resolve, reject) => {
       const request = https.request(options, (response) => {
         let data = '';
@@ -2376,10 +2376,10 @@ app.post('/api/send-galvaniz-notification', async (req, res) => {
     });
     
   } catch (error) {
-    // Log error but don't break the main flow
+    // Log Hata but don't break the main flow
     console.error('⚠️ Email gönderme hatası (ignored):', error.message);
     
-    // Still return success to not break the request creation
+    // Still return Başarılı to not break the request creation
     res.status(200).json({ 
       success: true, 
       emailSent: false,

@@ -1,4 +1,4 @@
-// Script to apply Tavli/Balya Tel database indexes migration
+// Script to apply Tavli/Balya Tel Veritabanı indexes Migrasyon
 // Run with: node run_tavli_migration.js
 
 require('dotenv').config();
@@ -15,14 +15,14 @@ async function runMigration() {
   console.log('🔧 Starting Tavli/Balya Tel indexes migration...\n');
 
   try {
-    // Read the migration SQL file
+    // Read the Migrasyon SQL file
     const migrationPath = path.join(__dirname, 'migrations', '20251112_add_tavli_tel_indexes.sql');
     const sql = fs.readFileSync(migrationPath, 'utf8');
 
     console.log('📄 Migration file loaded successfully');
     console.log('🔗 Connected to database\n');
 
-    // Execute the migration
+    // Execute the Migrasyon
     console.log('⚙️  Creating indexes...');
     await pool.query(sql);
 

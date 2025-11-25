@@ -19,7 +19,7 @@ async function runMigration() {
     const sqlFile = path.join(__dirname, 'migrations', '20251112_drop_yaglama_constraint.sql');
     const sql = fs.readFileSync(sqlFile, 'utf8');
 
-    // Execute the migration
+    // Execute the Migrasyon
     await client.query(sql);
 
     console.log('✅ Migration completed successfully!');

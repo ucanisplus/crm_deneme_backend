@@ -1,21 +1,21 @@
-// API Endpoints for new CRM features
+// Yeni CRM özellikleri için API Endpoints
 const express = require('express');
 const router = express.Router();
 
-// Test endpoint to verify database connection
+// Veritabanı bağlantısını doğrulamak için test endpoint'i
 router.get('/api/test-notifications', async (req, res) => {
   try {
     const { pool } = req.app.locals;
-    
-    // Test if table exists
+
+    // Tablo var mı kontrol et
     const tableCheck = await pool.query(`
       SELECT EXISTS (
-        SELECT FROM information_schema.tables 
+        SELECT FROM information_schema.tables
         WHERE table_name = 'crm_notifications'
       );
     `);
-    
-    // Get count of notifications
+
+    // Bildirim sayısını getir
     const countResult = await pool.query('SELECT COUNT(*) FROM crm_notifications');
     
     res.json({
@@ -32,23 +32,23 @@ router.get('/api/test-notifications', async (req, res) => {
   }
 });
 
-// Notifications Endpoints
+// Bildirimler Endpoints
 router.get('/api/notifications/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
     const { pool } = req.app.locals;
-    
-    // First check if any notifications exist for this user
+
+    // Bu kullanıcı için bildirim var mı önce kontrol et
     const result = await pool.query(
       'SELECT * FROM crm_notifications WHERE user_id = $1 ORDER BY created_at DESC',
       [userId]
     );
-    
-    // Always return an array, even if empty
+
+    // Boş olsa bile her zaman dizi döndür
     res.json(result.rows || []);
   } catch (error) {
     console.error('Error fetching notifications:', error);
-    // Return empty array instead of 500 error
+    // 500 hatası yerine boş dizi döndür
     res.json([]);
   }
 });
@@ -101,7 +101,7 @@ router.delete('/api/notifications/:id', async (req, res) => {
   }
 });
 
-// Create notification endpoint
+// Bildirim oluşturma endpoint'i
 router.post('/api/notifications', async (req, res) => {
   try {
     const { user_id, title, message, type = 'info', icon, action_link } = req.body;
@@ -121,19 +121,19 @@ router.post('/api/notifications', async (req, res) => {
   }
 });
 
-// User Preferences Endpoints
+// Kullanıcı Tercihleri Endpoints
 router.get('/api/preferences/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
     const { pool } = req.app.locals;
-    
+
     const result = await pool.query(
       'SELECT * FROM crm_user_preferences WHERE user_id = $1',
       [userId]
     );
-    
+
     if (result.rows.length === 0) {
-      // Create default preferences if not exists
+      // Yoksa varsayılan tercihleri oluştur
       const insertResult = await pool.query(
         'INSERT INTO crm_user_preferences (user_id) VALUES ($1) RETURNING *',
         [userId]
@@ -169,19 +169,19 @@ router.put('/api/preferences/:userId', async (req, res) => {
   }
 });
 
-// User Profile Endpoints
+// Kullanıcı Profili Endpoints
 router.get('/api/profile/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
     const { pool } = req.app.locals;
-    
+
     const result = await pool.query(
       'SELECT * FROM crm_user_profiles WHERE user_id = $1',
       [userId]
     );
-    
+
     if (result.rows.length === 0) {
-      // Create default profile if not exists
+      // Yoksa varsayılan profil oluştur
       const insertResult = await pool.query(
         'INSERT INTO crm_user_profiles (user_id) VALUES ($1) RETURNING *',
         [userId]
@@ -217,7 +217,7 @@ router.put('/api/profile/:userId', async (req, res) => {
   }
 });
 
-// Search History Endpoints
+// Arama Geçmişi Endpoints
 router.post('/api/search-history', async (req, res) => {
   try {
     const { user_id, search_term, search_category, results_count } = req.body;
@@ -254,7 +254,7 @@ router.get('/api/search-history/:userId', async (req, res) => {
   }
 });
 
-// Activity Logs Endpoints
+// Aktivite Logları Endpoints
 router.post('/api/activity-log', async (req, res) => {
   try {
     const { user_id, activity_type, activity_description, module, ip_address, user_agent } = req.body;
@@ -274,7 +274,7 @@ router.post('/api/activity-log', async (req, res) => {
   }
 });
 
-// User Favorites Endpoints
+// Kullanıcı Favorileri Endpoints
 router.get('/api/favorites/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
@@ -325,7 +325,7 @@ router.delete('/api/favorites/:id', async (req, res) => {
   }
 });
 
-// Mesh Type Configuration Endpoints
+// Hasır Tipi Konfigürasyon Endpoints
 router.get('/api/mesh-configs', async (req, res) => {
   try {
     const { pool } = req.app.locals;
@@ -366,8 +366,8 @@ router.post('/api/mesh-configs', async (req, res) => {
   try {
     const { hasirTipi, boyCap, enCap, boyAralik, enAralik, type, description } = req.body;
     const { pool } = req.app.locals;
-    
-    // Validate required fields
+
+    // Gerekli alanları doğrula
     if (!hasirTipi || !boyCap || !enCap || !boyAralik || !enAralik || !type) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
@@ -385,7 +385,7 @@ router.post('/api/mesh-configs', async (req, res) => {
     });
   } catch (error) {
     console.error('Error creating mesh configuration:', error);
-    if (error.code === '23505') { // Unique constraint violation
+    if (error.code === '23505') { // Unique constraint ihlali
       res.status(409).json({ error: 'Mesh type already exists' });
     } else {
       res.status(500).json({ error: 'Failed to create mesh configuration' });

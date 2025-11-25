@@ -1,38 +1,38 @@
-// Vercel Serverless Function for sending emails
-// This keeps your API keys secure on Vercel's servers
+// Vercel Serverless Function - E-posta gönderme fonksiyonu
+// API anahtarlarınızı Vercel sunucularında güvenli tutar
 
 export default async function handler(req, res) {
-  // Enable CORS
+  // CORS'u etkinleştir
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-  // Handle preflight requests
+  // Preflight isteklerini işle
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
 
-  // Only allow POST requests
+  // Sadece POST isteklerine izin ver
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
     const { requestData, requestId } = req.body;
-    
-    // Get API key from environment variable (set in Vercel dashboard)
+
+    // API anahtarını çevre değişkeninden al (Vercel dashboard'da ayarlanır)
     const RESEND_API_KEY = process.env.RESEND_API_KEY;
-    
+
     if (!RESEND_API_KEY) {
       console.error('RESEND_API_KEY not configured');
-      // Don't expose the error to frontend
-      return res.status(200).json({ 
-        success: true, 
-        message: 'Email request received (configuration pending)' 
+      // Hatayı frontend'e gösterme
+      return res.status(200).json({
+        success: true,
+        message: 'Email request received (configuration pending)'
       });
     }
 
-    // Format email HTML
+    // E-posta HTML formatını hazırla
     const emailHtml = `
       <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 650px; margin: 0 auto; background-color: #ffffff;">
         <!-- Header with Logo -->
@@ -90,7 +90,7 @@ export default async function handler(req, res) {
       </div>
     `;
 
-    // Send email using Resend API
+    // Resend API kullanarak e-posta gönder
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
@@ -117,10 +117,10 @@ export default async function handler(req, res) {
 
   } catch (error) {
     console.error('Email error:', error);
-    // Don't break the main flow
-    return res.status(200).json({ 
-      success: true, 
-      message: 'Email request processed' 
+    // Ana akışı bozma
+    return res.status(200).json({
+      success: true,
+      message: 'Email request processed'
     });
   }
 }

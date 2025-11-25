@@ -1,4 +1,4 @@
-// Script to execute CH.STD recipe SQL script
+// CH.STD reçete SQL scriptini çalıştırmak için script
 require('dotenv').config({ path: '/mnt/c/Users/Selman/Desktop/UBUNTU/crm_deneme_backend-main/.env' });
 const { Pool } = require('pg');
 const fs = require('fs');

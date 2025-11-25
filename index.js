@@ -1,4 +1,4 @@
-// COMPLETE FIXED VERSION OF INDEX.JS WITH TIMESTAMP ISSUE RESOLVED
+// INDEX.JS TIMESTAMP SORUNU ÇÖZÜLMÜŞİYLEŞTİRİLMİŞ VERSİYONU
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
@@ -7,7 +7,7 @@ const bcrypt = require('bcryptjs');
 const { Redis } = require('@upstash/redis');
 
 const app = express();
-// Enhanced CORS configuration for Vercel deployment
+// Vercel deployment için gelişmiş CORS konfigürasyonu
 app.use(cors({
   origin: '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -15,12 +15,12 @@ app.use(cors({
   credentials: false
 }));
 
-// Explicit CORS middleware for all requests
+// Tüm istekler için açık CORS middleware
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept');
-  
+
   if (req.method === 'OPTIONS') {
     res.sendStatus(200);
   } else {
@@ -31,14 +31,14 @@ app.use((req, res, next) => {
 // CORS Preflight kontrolü için OPTIONS yanıtı
 app.options('*', cors());
 
-// Increase JSON payload size limit and add better error handling
+// JSON payload boyut limitini artır ve daha iyi hata yönetimi ekle
 app.use(express.json({ limit: '10mb' }));
 
-// JSON parse error handling middleware
+// JSON Parse et hata yönetimi Middleware
 app.use((err, req, res, next) => {
   if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
     console.error('JSON Parse Error:', err.message);
-    return res.status(400).json({ 
+    return res.status(400).json({
       error: 'Invalid JSON in request body',
       details: err.message
     });
@@ -46,59 +46,59 @@ app.use((err, req, res, next) => {
   next();
 });
 
-// EMERGENCY FIX: Remove timestamp fields that cause problems
+// ACİL DÜZELTME: Sveyaun yaratan timestamp alanlarını kaldır
 app.use((req, res, next) => {
   if ((req.method === 'POST' || req.method === 'PUT') && req.body) {
-    console.log('⚠️ EMERGENCY FIX - Removing timestamp fields in:', req.url);
-    
-    // Just remove any problematic timestamp fields
+    console.log('⚠️ ACİL DÜZELTME - Timestamp alanları kaldırılıyor:', req.url);
+
+    // Sveyaunlu timestamp alanlarını kaldır
     const removeTimestamps = (obj) => {
       if (!obj || typeof obj !== 'object') return obj;
-      
-      // Handle arrays
+
+      // Dizileri işle
       if (Array.isArray(obj)) {
         return obj.map(item => removeTimestamps(item));
       }
-      
-      // For objects, make a copy we can modify
+
+      // Nesneler için değiştirilebilir bir kopya oluştur
       const result = {...obj};
-      
-      // Simply DELETE any field that might be a timestamp
+
+      // Timestamp olabilecek alanları tamamen SİL
       for (const key of Object.keys(result)) {
-        // If it looks like a timestamp field, just delete it completely
-        if (key.includes('_update') || key.includes('_tarihi') || 
+        // Timestamp alanı gibi görünüyveyasa tamamen sil
+        if (key.includes('_update') || key.includes('_tarihi') ||
             key.endsWith('_at') || key.includes('Date')) {
-          console.log(`✂️ REMOVING problematic field: ${key}`);
+          console.log(`✂️ Sorunlu alan kaldırılıyor: ${key}`);
           delete result[key];
         }
-        // Handle nested objects
+        // İç içe nesneleri işle
         else if (result[key] && typeof result[key] === 'object') {
           result[key] = removeTimestamps(result[key]);
         }
       }
-      
+
       return result;
     };
-    
-    // Apply the fix to all requests
+
+    // Tüm isteklere düzeltmeyi uygula
     req.body = removeTimestamps(req.body);
-    console.log('📝 FIXED: All timestamp fields removed');
+    console.log('📝 DÜZELTİLDİ: Tüm timestamp alanları kaldırıldı');
   }
-  
+
   next();
 });
 
-// PostgreSQL Bağlantısı - SERVERLESS OPTIMIZED (Vercel + Supabase)
+// PostgreSQL Bağlantısı - SERVERLESS OPTİMİZE EDİLMİŞ (Vercel + Supabase)
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
     ssl: { rejectUnauthorized: false },
-    // ✅ FIXED: Serverless-friendly settings for Vercel
-    max: 1,                        // Minimal connections for serverless
-    idleTimeoutMillis: 5000,       // Close idle connections quickly (5s)
-    connectionTimeoutMillis: 5000  // Fail fast if can't connect (5s)
+    // ✅ DÜZELTİLDİ: Vercel için serverless-friendly ayarlar
+    max: 1,                        // Serverless için minimal bağlantı
+    idleTimeoutMillis: 5000,       // Boştaki bağlantıları hızlı kapat (5s)
+    connectionTimeoutMillis: 5000  // Bağlanamazsa hızlı başarısız ol (5s)
 });
 
-// 🧹 AGGRESSIVE Database Connection Cleanup Function (for serverless)
+// 🧹 AGRESIF Veritabanı Bağlantı Temizleme Fonksiyonu (serverless için)
 const cleanupIdleConnections = async () => {
   try {
     const result = await pool.query(`
@@ -115,18 +115,18 @@ const cleanupIdleConnections = async () => {
 
     const terminatedCount = result.rows.filter(r => r.pg_terminate_backend === true).length;
     if (terminatedCount > 0) {
-      console.log(`🧹 Cleaned up ${terminatedCount} idle database connections`);
+      console.log(`🧹 ${terminatedCount} boş veritabanı bağlantısı temizlendi`);
     }
   } catch (error) {
-    // Don't crash the server if cleanup fails
-    console.error('⚠️ Connection cleanup error:', error.message);
+    // Temizleme başarısız olursa sunucuyu çökertme
+    console.error('⚠️ Bağlantı temizleme hatası:', error.message);
   }
 };
 
-// ⚡ Emergency cleanup for "max connections" errors
+// ⚡ "Max connections" hataları için acil temizleme
 const emergencyCleanup = async () => {
   try {
-    console.log('🚨 EMERGENCY: Cleaning ALL idle connections immediately');
+    console.log('🚨 ACİL DURUM: TÜM boş bağlantılar hemen temizleniyor');
     const result = await pool.query(`
       SELECT pg_terminate_backend(pid)
       FROM pg_stat_activity
@@ -138,22 +138,22 @@ const emergencyCleanup = async () => {
         )
     `);
     const terminatedCount = result.rows.filter(r => r.pg_terminate_backend === true).length;
-    console.log(`🚨 Emergency cleanup: terminated ${terminatedCount} connections`);
+    console.log(`🚨 Acil temizleme: ${terminatedCount} bağlantı sonlandırıldı`);
     return terminatedCount;
   } catch (error) {
-    console.error('❌ Emergency cleanup failed:', error.message);
+    console.error('❌ Acil temizleme başarısız:', error.message);
     return 0;
   }
 };
 
-// Run cleanup once on startup
+// Başlangıçta bir kez temizlik yap
 cleanupIdleConnections();
 
-// Schedule aggressive cleanup every 1 minute (for serverless heavy load)
+// Her 1 dakikada bir agresif temizlik planla (serverless yoğun yük için)
 setInterval(cleanupIdleConnections, 60 * 1000);
-console.log('🧹 AGGRESSIVE Database connection cleanup scheduled (every 60 seconds)');
+console.log('🧹 AGRESIF veritabanı bağlantı temizliği planlandı (her 60 saniyede)');
 
-// Redis Configuration for Caching
+// Önbellekleme için Redis Konfigürasyonu
 let redis;
 try {
   if (process.env.UPSTASH_REDIS_URL && process.env.UPSTASH_REDIS_TOKEN) {
@@ -161,120 +161,120 @@ try {
       url: process.env.UPSTASH_REDIS_URL,
       token: process.env.UPSTASH_REDIS_TOKEN,
     });
-    console.log('✅ Redis cache initialized successfully');
+    console.log('✅ Redis cache başarıyla başlatıldı');
   } else {
-    console.warn('⚠️ Redis not configured - running without cache');
+    console.warn('⚠️ Redis konfigüre edilmemiş - cache olmadan çalışıyor');
     redis = null;
   }
 } catch (error) {
-  console.error('❌ Redis initialization failed:', error);
+  console.error('❌ Redis başlatma başarısız:', error);
   redis = null;
 }
 
-// Redis Cache Helper Functions
+// Redis Önbellek Yardımcı Fonksiyonları
 const cacheHelpers = {
-  // Generate cache key for table queries
+  // Tablo sorguları için cache anahtarı oluştur
   generateCacheKey: (table, filters = {}, page = null, limit = null) => {
-    const filterString = Object.keys(filters).length > 0 ? 
+    const filterString = Object.keys(filters).length > 0 ?
       JSON.stringify(filters, Object.keys(filters).sort()) : 'no-filters';
     const pageString = page ? `page:${page}` : 'no-page';
     const limitString = limit ? `limit:${limit}` : 'no-limit';
     return `celik_hasir:${table}:${filterString}:${pageString}:${limitString}`;
   },
 
-  // Get from cache
+  // Cache'den getir
   get: async (key) => {
     if (!redis) return null;
     try {
       const data = await redis.get(key);
       if (data) {
-        console.log(`🎯 Cache HIT: ${key}`);
+        console.log(`🎯 Cache BULUNDU: ${key}`);
         return JSON.parse(data);
       }
-      console.log(`💨 Cache MISS: ${key}`);
+      console.log(`💨 Cache BULUNAMADI: ${key}`);
       return null;
     } catch (error) {
-      console.error('Cache GET error:', error);
+      console.error('Cache GET hatası:', error);
       return null;
     }
   },
 
-  // Set to cache with TTL (default 5 minutes)
+  // TTL ile cache'e kaydet (varsayılan 5 dakika)
   set: async (key, data, ttlSeconds = 300) => {
     if (!redis) return false;
     try {
       await redis.setex(key, ttlSeconds, JSON.stringify(data));
-      console.log(`💾 Cached: ${key} (TTL: ${ttlSeconds}s)`);
+      console.log(`💾 Cache'e kaydedildi: ${key} (TTL: ${ttlSeconds}s)`);
       return true;
     } catch (error) {
-      console.error('Cache SET error:', error);
+      console.error('Cache SET hatası:', error);
       return false;
     }
   },
 
-  // Delete from cache
+  // Cache'den sil
   del: async (pattern) => {
     if (!redis) return false;
     try {
       if (pattern.includes('*')) {
-        // Delete by pattern
+        // Pattern'e göre sil
         const keys = await redis.keys(pattern);
         if (keys.length > 0) {
           await redis.del(...keys);
-          console.log(`🗑️ Cache cleared: ${keys.length} keys matching ${pattern}`);
+          console.log(`🗑️ Cache temizlendi: ${pattern} ile eşleşen ${keys.length} anahtar`);
         }
       } else {
-        // Delete single key
+        // Tek anahtarı sil
         await redis.del(pattern);
-        console.log(`🗑️ Cache cleared: ${pattern}`);
+        console.log(`🗑️ Cache temizlendi: ${pattern}`);
       }
       return true;
     } catch (error) {
-      console.error('Cache DEL error:', error);
+      console.error('Cache DEL hatası:', error);
       return false;
     }
   },
 
-  // Clear all cache for a table
+  // Bir tablo için tüm cache'i temizle
   clearTableCache: async (table) => {
     return await cacheHelpers.del(`celik_hasir:${table}:*`);
   }
 };
 
-// Database error handling
+// Veritabanı hata yönetimi
 pool.on('error', (err) => {
-  console.error('Unexpected database error:', err);
+  console.error('Beklenmeyen veritabanı hatası:', err);
 });
 
-// Sayı formatını düzenleyen yardımcı fonksiyon - İYİLEŞTİRİLMİŞ
-// Virgül yerine nokta kullanarak sayı formatını düzenler
+// Sayı içinmatını düzenleyen yardımcı fonksiyon - İYİLEŞTİRİLMİŞ
+// Virgül yerine nokta kullanarak sayı içinmatını düzenler
 const normalizeNumber = (value) => {
   // Null veya undefined değerleri null olarak döndür
   if (value === null || value === undefined) {
     return null;
   }
-  
+
   if (typeof value === 'number') {
     return value;
   }
-  
+
   if (typeof value === 'string') {
     // Boş string kontrolü
     if (value.trim() === '') {
       return null;
     }
-    
+
     // Virgülleri noktalara çevir - global flag ile tüm virgülleri değiştir
     if (value.includes(',')) {
       return parseFloat(value.replace(/,/g, '.'));
     }
-    
+
     // Sayısal değer mi kontrol et
     if (!isNaN(parseFloat(value))) {
       return parseFloat(value);
     }
   }
-  
+
   return value;
 };
 
@@ -284,26 +284,26 @@ const normalizeData = (data) => {
   if (data === null || data === undefined) {
     return null;
   }
-  
+
   // Dizi ise her öğeyi işle
   if (Array.isArray(data)) {
     return data.map(item => normalizeData(item));
   }
-  
+
   // Nesne ise her değeri işle
   if (typeof data === 'object') {
     const normalizedData = {};
-    
+
     for (const [key, value] of Object.entries(data)) {
-      // Skip normalization for text fields that should remain as strings
-      const textFields = ['stok_adi', 'stok_kodu', 'ingilizce_isim', 'hasir_tipi', 'grup_kodu', 
-                          'kod_1', 'kod_2', 'br_1', 'br_2', 'olcu_br_3', 'hasir_turu', 
+      // String olarak kalması gereken metin alanları için normalizasyonu atla
+      const textFields = ['stok_adi', 'stok_kodu', 'ingilizce_isim', 'hasir_tipi', 'grup_kodu',
+                          'kod_1', 'kod_2', 'br_1', 'br_2', 'olcu_br_3', 'hasir_turu',
                           'stok_turu', 'esnek_yapilandir', 'super_recete_kullanilsin',
                           'bilesen_kodu', 'olcu_br_bilesen', 'aciklama', 'operasyon_bilesen',
                           'goz_araligi', 'mamul_kodu'];
-      
+
       if (textFields.includes(key)) {
-        // Keep text fields as-is, just handle empty strings
+        // Metin alanlarını olduğu gibi tut, sadece boş string'leri işle
         normalizedData[key] = (typeof value === 'string' && value.trim() === '') ? null : value;
       }
       // Boş string kontrolü
@@ -317,10 +317,10 @@ const normalizeData = (data) => {
         normalizedData[key] = normalizeNumber(value);
       }
     }
-    
+
     return normalizedData;
   }
-  
+
   // Diğer tüm durumlar için sayı normalizasyonu uygula
   return normalizeNumber(data);
 };
@@ -356,7 +356,7 @@ app.get('/api/test', async (req, res) => {
     }
 });
 
-// Filmaşin Priority Mapping API
+// Filmaşin Priveyaity Mapping API
 app.get('/api/filmasin-priority/:targetDiameter/:priority', async (req, res) => {
     try {
         const { targetDiameter, priority } = req.params;
@@ -401,7 +401,7 @@ app.get('/api/filmasin-priority/:targetDiameter/:priority', async (req, res) => 
     }
 });
 
-// Get all filmaşin alternatives for a target diameter
+// Hedef çap için tüm filmaşin alternatiflerini getir
 app.get('/api/filmasin-alternatives/:targetDiameter', async (req, res) => {
     try {
         const { targetDiameter } = req.params;
@@ -440,7 +440,7 @@ app.get('/api/filmasin-alternatives/:targetDiameter', async (req, res) => {
             targetDiameter: parseFloat(targetDiameter),
             alternatives: alternatives,
             mainRecipe: alternatives.find(alt => alt.priority === 0) || null,
-            alternativeCount: alternatives.length - 1 // Exclude main recipe
+            alternativeCount: alternatives.length - 1 // Ana reçeteyi hariç tut
         });
 
     } catch (error) {
@@ -463,7 +463,7 @@ app.post('/api/signup', async (req, res) => {
     try {
         // Kullanıcı zaten var mı kontrol et
         const existingUser = await pool.query('SELECT * FROM crm_users WHERE username = $1 OR email = $2', [username, email]);
-        
+
         if (existingUser.rows.length > 0) {
             return res.status(400).json({ error: 'Kullanıcı adı veya email zaten kullanılıyor' });
         }
@@ -943,7 +943,7 @@ async function checkAndCreateTable(tableName) {
           )
         `;
       } else if (tableName === 'celik_hasir_netsis_mm') {
-        // Çelik Hasır MM (CH STOK) tablosu
+        // Çelik Hasır MM (CH SaK) tablosu
         createTableQuery = `
           CREATE TABLE ${tableName} (
             id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -1305,7 +1305,7 @@ async function checkAndCreateTable(tableName) {
           )
         `;
       } else {
-        // Genel tablolar - tüm tablolarda TIMESTAMP WITH TIME ZONE kullanıyoruz
+        // Genel tablolar - tüm tablolarda TIMESTAMP ile TIME ZONE kullanıyveyauz
         createTableQuery = `
           CREATE TABLE ${tableName} (
             id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -1365,7 +1365,7 @@ async function checkAndCreateTable(tableName) {
     } else {
       // Panel Çit tabloları için timestamp kontrolü yapıp timestamptz'ye güncelleme
       if (tableName.includes('panel_cit')) {
-        // Check if we need to alter the timestamp columns
+        // Check if we need a alter the timestamp columns
         const timestampColCheck = await pool.query(`
           SELECT data_type, column_name 
           FROM information_schema.columns 
@@ -1374,11 +1374,11 @@ async function checkAndCreateTable(tableName) {
           AND data_type = 'timestamp without time zone'
         `, [tableName]);
         
-        // If there are timestamp columns without timezone, alter them
+        // If there are timestamp columns ileout timezone, alter them
         if (timestampColCheck.rows.length > 0) {
           console.log(`⚠️ ${tableName} tablosunda timezone olmayan tarih alanları bulundu. Güncelleniyor...`);
           
-          // Alter each column using a transaction
+          // Alter Her column using a transaction
           await pool.query('BEGIN');
           try {
             for (const row of timestampColCheck.rows) {
@@ -1445,12 +1445,12 @@ async function insertDefaultUserInputValues() {
   }
 }
 
-// Create critical indexes for performance
+// Oluştur critical indexes için periçinmance
 async function createGalvanizliTelIndexes() {
     try {
         console.log('🔧 Creating indexes for galvanizli tel tables...');
         
-        // Critical indexes for stok_kodu lookups
+        // Critical indexes için sak_kodu lookups
         const indexes = [
             'CREATE INDEX IF NOT EXISTS idx_gal_mm_gt_stok_kodu ON gal_cost_cal_mm_gt(stok_kodu)',
             'CREATE INDEX IF NOT EXISTS idx_gal_ym_gt_stok_kodu ON gal_cost_cal_ym_gt(stok_kodu)', 
@@ -1473,25 +1473,25 @@ async function createGalvanizliTelIndexes() {
 // Tablolar oluşturulduktan sonra varsayılan değerleri ve indexleri ekle
 setTimeout(insertDefaultUserInputValues, 5000);
 // DISABLED: Indexes already created, no need to recreate on every cold start
-// setTimeout(createGalvanizliTelIndexes, 6000);
+// setTimeout(OluşturGalvanizliTelIndexes, 6000);
 
-// DIAGNOSTIC ENDPOINT - Test galvanizli tel database connectivity
+// DIAGNOSTIC Endpoint - Test galvanizli tel Veritabanı connectivity
 app.get('/api/diagnostic/gal_test', async (req, res) => {
     try {
         console.log('🔍 DIAGNOSTIC: Testing galvanizli tel database connectivity...');
         const startTime = Date.now();
         
-        // Test 1: Simple count query
+        // Test 1: Simple count Sorgu
         const countResult = await pool.query('SELECT COUNT(*) FROM gal_cost_cal_mm_gt');
         const count = countResult.rows[0].count;
         console.log(`🔍 DIAGNOSTIC: Found ${count} records in gal_cost_cal_mm_gt`);
         
-        // Test 2: Simple select with limit
+        // Test 2: Simple Seç ile Limit
         const selectResult = await pool.query('SELECT stok_kodu FROM gal_cost_cal_mm_gt LIMIT 1');
         const sample = selectResult.rows[0]?.stok_kodu || 'No records';
         console.log(`🔍 DIAGNOSTIC: Sample stok_kodu: ${sample}`);
         
-        // Test 3: Exact match query (the failing one)
+        // Test 3: Exact match Sorgu (the failing one)
         const exactResult = await pool.query('SELECT COUNT(*) FROM gal_cost_cal_mm_gt WHERE stok_kodu = $1', ['GT.NIT.0810.00']);
         const exactCount = exactResult.rows[0].count;
         console.log(`🔍 DIAGNOSTIC: Exact match count for GT.NIT.0810.00: ${exactCount}`);
@@ -1562,7 +1562,7 @@ for (const table of tables) {
                 console.log(`🚨 [${table}] Initial whereConditions:`, whereConditions);
             }
             
-            // Sorgu parametrelerine göre WHERE koşullarını oluştur
+            // Sveyagu parametrelerine göre WHERE koşullarını oluştur
             if (id) {
                 whereConditions.push(`id = $${queryParams.length + 1}`);
                 queryParams.push(id);
@@ -1622,7 +1622,7 @@ for (const table of tables) {
                 // For galvanizli tel sequence generation, optimize the query (only for tables that have stok_kodu)
                 const tablesWithStokKodu = ['gal_cost_cal_mm_gt', 'gal_cost_cal_ym_gt', 'gal_cost_cal_ym_st'];
                 if (tablesWithStokKodu.includes(table) && !id && !ids) {
-                    // Only select stok_kodu column for sequence generation to speed up query
+                    // Only Seç sak_kodu column için sequence generation a speed up Sorgu
                     query = `SELECT stok_kodu FROM ${table}`;
                     console.log(`🚨 [${table}] Optimized query for sequence generation:`, query);
                 }
@@ -1667,7 +1667,7 @@ for (const table of tables) {
                 console.log(`🔍 Filtering ${table} by mamul_kodu: ${mamul_kodu}`);
             }
             
-            // REDIS CACHE CHECK - Before processing query for celik_hasir tables
+            // REDIS Önbellek CHECK - Beiçine İşleing Sorgu için celik_hasir Tablos
             if (table.includes('celik_hasir')) {
                 const filters = { hasir_tipi, boy_cap, en_cap, uzunluk_boy, uzunluk_en, goz_araligi, stok_adi_like, 
                                  id, mm_gt_id, ym_gt_id, ym_st_id, kod_2, cap, stok_kodu, stok_kodu_like, 
@@ -1680,10 +1680,10 @@ for (const table of tables) {
                 
                 const cacheKey = cacheHelpers.generateCacheKey(table, cleanFilters, page, limit);
                 
-                // Try to get from cache first
+                // Try a get den Önbellek first
                 const cachedData = await cacheHelpers.get(cacheKey);
                 if (cachedData) {
-                    // Return cached data with headers
+                    // Döndür Önbellekd data ile Başlıklar
                     res.setHeader('X-Total-Count', cachedData.totalRows);
                     res.setHeader('X-Cache', 'HIT');
                     res.setHeader('Cache-Control', 'public, max-age=300'); // 5 minutes cache for browsers
@@ -1744,7 +1744,7 @@ for (const table of tables) {
                 console.log(`🚨 [${table}] whereConditions count: ${whereConditions.length}`);
                 console.log(`🚨 [${table}] queryParams count: ${queryParams.length}`);
                 
-                // Validate parameter count matches placeholders
+                // Doğrula parameter count matches placeholders
                 const placeholderCount = whereConditions.join(' ').match(/\$\d+/g)?.length || 0;
                 console.log(`🚨 [${table}] Placeholder count in conditions: ${placeholderCount}`);
                 console.log(`🚨 [${table}] MISMATCH CHECK: placeholders(${placeholderCount}) vs params(${queryParams.length})`);
@@ -1766,14 +1766,14 @@ for (const table of tables) {
                 console.log(`🚨 [${table}] Final query after WHERE:`, query);
             }
             
-            // DEBUG: Log final query and parameters for galvanizli tel tables
+            // DEBUG: Log final Sorgu ve parameters için galvanizli tel Tablos
             if (table.includes('gal_cost_cal')) {
                 console.log(`🔍 [${table}] Final query: "${query}"`);
                 console.log(`🔍 [${table}] Parameters: [${queryParams.map(p => `"${p}"`).join(', ')}]`);
                 console.log(`🔍 [${table}] Where conditions: [${whereConditions.join(', ')}]`);
             }
             
-            // PAGINATION SUPPORT - Only apply pagination when explicitly requested via limit parameter
+            // Sayfalama SUPPveyaT - Only apply Sayfalama when explicitly İsteked via Limit parameter
             const pageSize = parseInt(limit) || null; // No default limit
             const pageNumber = parseInt(page) || 1;
             const offsetValue = parseInt(offset) || ((pageNumber - 1) * (pageSize || 0));
@@ -1789,11 +1789,11 @@ for (const table of tables) {
             } else if (table === 'gal_cost_cal_sal_requests') {
                 query += ` ORDER BY created_at DESC`;
             } else if (table.includes('celik_hasir')) {
-                // Default ordering for celik_hasir tables
+                // Default veyadering için celik_hasir Tablos
                 query += ' ORDER BY id';
             }
             
-            // Add pagination only when explicitly requested - FIXED PARAMETER INDEXING
+            // Add Sayfalama only when explicitly İsteked - FIXED PARAMETER INDEXING
             if (pageSize && pageSize > 0) {
                 const limitIndex = queryParams.length + 1;
                 const offsetIndex = queryParams.length + 2;
@@ -1805,16 +1805,16 @@ for (const table of tables) {
             console.log(`🔍 ${table} için sorgu:`, query);
             console.log("📝 Parametreler:", queryParams);
             
-            // Get a client from the pool for better connection management
+            // Get a client den the pool için better connection management
             const client = await pool.connect();
             
             try {
-                // Set statement timeout for this specific query - OPTIMIZED FOR GALVANIZLI TEL
+                // Set Durumment timeout için this specific Sorgu - OPTIMIZED için GALVANIZLI TEL
                 if (table.includes('gal_cost_cal')) {
                     await client.query('SET statement_timeout = 8000'); // 8 seconds for Vercel
                     console.log(`🚨 [${table}] Set 8-second timeout for Vercel compatibility`);
                     
-                    // Additional optimizations for large galvanizli tel tables
+                    // Additional optimizations için large galvanizli tel Tablos
                     await client.query('SET enable_seqscan = off'); // Force index usage
                     await client.query('SET work_mem = "64MB"'); // Increase sort memory
                     console.log(`🚨 [${table}] Applied performance optimizations`);
@@ -1822,7 +1822,7 @@ for (const table of tables) {
                     await client.query('SET statement_timeout = 60000'); // 60 seconds for other tables
                 }
                 
-                // Check if we need to count total rows (for large datasets)
+                // Check if we need a count atal rows (için large datasets)
                 // Remove ORDER BY and LIMIT/OFFSET from count query
                 let countQuery = query.replace(/SELECT [^F]*FROM/, 'SELECT COUNT(*) as total FROM');
                 countQuery = countQuery.replace(/ORDER BY.*$/i, '');
@@ -1832,8 +1832,8 @@ for (const table of tables) {
                     console.log(`🚨 [${table}] Count query:`, countQuery);
                 }
                 
-                // For count query, exclude pagination parameters (LIMIT/OFFSET)
-                // Count query should only use WHERE condition parameters, not pagination params
+                // için count Sorgu, exclude Sayfalama parameters (Limit/Ofset)
+                // Count Sorgu should only use WHERE condition parameters, not Sayfalama Parametreler
                 let countParams = queryParams;
                 if (pageSize && pageSize > 0) {
                     // Remove the last 2 parameters (LIMIT and OFFSET values)
@@ -1851,10 +1851,10 @@ for (const table of tables) {
                 console.log(`📊 ${table} total rows: ${totalRows}`);
                 
                 
-                // Execute the main query
+                // Execute the main Sorgu
                 const result = await client.query(query, queryParams);
                 
-                // REDIS CACHE STORE - Cache results for celik_hasir tables
+                // REDIS Önbellek SaRE - Önbellek results için celik_hasir Tablos
                 if (table.includes('celik_hasir') && result.rows.length > 0) {
                     const filters = { hasir_tipi, boy_cap, en_cap, uzunluk_boy, uzunluk_en, goz_araligi, stok_adi_like, 
                                      id, mm_gt_id, ym_gt_id, ym_st_id, kod_2, cap, stok_kodu, stok_kodu_like, 
@@ -1866,14 +1866,14 @@ for (const table of tables) {
                     
                     const cacheKey = cacheHelpers.generateCacheKey(table, cleanFilters, page, limit);
                     
-                    // Store in cache with 5 minute TTL
+                    // Sare in Önbellek ile 5 minute TTL
                     await cacheHelpers.set(cacheKey, {
                         rows: result.rows,
                         totalRows: totalRows
                     }, 300);
                 }
                 
-                // Add total count to response headers for frontend
+                // Add atal count a Yanıt Başlıklar için frontend
                 res.setHeader('X-Total-Count', totalRows);
                 res.setHeader('X-Cache', 'MISS');
                 res.setHeader('Cache-Control', table.includes('celik_hasir') ? 'public, max-age=300' : 'no-cache');
@@ -1881,7 +1881,7 @@ for (const table of tables) {
                 // API tutarlılığı: Her zaman dizi döndür, boş sonuç için boş dizi
                 res.json(result.rows);
             } finally {
-                // Always release the client back to the pool
+                // Always release the client back a the pool
                 client.release();
             }
         } catch (error) {
@@ -1906,16 +1906,16 @@ for (const table of tables) {
             
             console.error(`${table} tablosundan veri getirme hatası:`, error);
             
-            // Better error handling for different error types
+            // Better errveya hveling için different errveya types
             if (error.code === '57014') {
-                // Query timeout
+                // Sorgu timeout
                 return res.status(504).json({ 
                     error: 'Query timeout - dataset too large',
                     suggestion: 'Try using filters to reduce the dataset size',
                     code: error.code
                 });
             } else if (error.code === '53300') {
-                // Too many connections
+                // ao many connections
                 return res.status(503).json({ 
                     error: 'Database connection limit reached',
                     suggestion: 'Please try again in a moment',
@@ -2060,7 +2060,7 @@ app.get('/api/check-recipes', async (req, res) => {
       if (mmGtRecipe.rows.length > 0) {
         const ymGtBilesenKodu = mmGtRecipe.rows[0].bilesen_kodu;
 
-        // Step 2: Find YM GT product by stok_kodu
+        // Step 2: Find YM GT Ürün ile sak_kodu
         const ymGtProduct = await pool.query(
           `SELECT id FROM gal_cost_cal_ym_gt WHERE stok_kodu = $1 LIMIT 1`,
           [ymGtBilesenKodu]
@@ -2080,7 +2080,7 @@ app.get('/api/check-recipes', async (req, res) => {
           if (ymGtRecipe.rows.length > 0) {
             const ymStBilesenKodu = ymGtRecipe.rows[0].bilesen_kodu;
 
-            // Step 4: Find YM ST product by stok_kodu with priority 0
+            // Step 4: Find YM ST Ürün ile sak_kodu ile priveyaity 0
             const ymStProduct = await pool.query(
               `SELECT id FROM gal_cost_cal_ym_st
                WHERE stok_kodu = $1 AND (priority = 0 OR priority IS NULL)
@@ -2091,7 +2091,7 @@ app.get('/api/check-recipes', async (req, res) => {
             if (ymStProduct.rows.length > 0) {
               mainYmStId = ymStProduct.rows[0].id;
 
-              // Get YM ST recipes count
+              // Get YM ST Reçetes count
               const ymStResult = await pool.query(
                 'SELECT COUNT(*) FROM gal_cost_cal_ym_st_recete WHERE ym_st_id = $1',
                 [mainYmStId]
@@ -2103,7 +2103,7 @@ app.get('/api/check-recipes', async (req, res) => {
       }
     } catch (error) {
       console.error('Error finding YM ST through recipe chain:', error);
-      // Continue with mainYmStId = null
+      // Continue ile mainYmStId = null
     }
     
     res.json({
@@ -2153,7 +2153,7 @@ for (const table of tables) {
                 
                 for (const item of data) {
                     try {
-                      // Sayı değerlerini normalize et (virgülleri noktalara çevir)
+                      // Sayı değerlerini nveyamalize et (virgülleri noktalara çevir)
                       const normalizedItem = normalizeData(item);
                       
                       // Boş değilse devam et
@@ -2187,14 +2187,14 @@ for (const table of tables) {
                       const result = await pool.query(query, values);
                       results.push(result.rows[0]);
                       
-                      // Add notification for Galvaniz Talebi
+                      // Add notification için Galvaniz Talebi
                       if (table === 'gal_cost_cal_sal_requests' && result.rows[0]) {
                         try {
                           const notificationQuery = `
                             INSERT INTO crm_notifications (user_id, title, message, type, icon, action_link) 
                             VALUES ($1, $2, $3, $4, $5, $6)
                           `;
-                          // Get username from session or use created_by field
+                          // Get username den session veya use Oluşturd_ile field
                           const username = normalizedItem.created_by || normalizedItem.username || 'admin';
                           
                           await pool.query(notificationQuery, [
@@ -2221,7 +2221,7 @@ for (const table of tables) {
                   return res.status(400).json({ error: 'Hiçbir geçerli öğe eklenemedi' });
                 }
                 
-                // REDIS CACHE INVALIDATION - Clear cache when batch data is added
+                // REDIS Önbellek GeçersizATION - Clear Önbellek when batch data is added
                 if (table.includes('celik_hasir') && results.length > 0) {
                   await cacheHelpers.clearTableCache(table);
                   console.log(`🗑️ Cache cleared for table: ${table} (batch insert)`);
@@ -2229,7 +2229,7 @@ for (const table of tables) {
                 
                 res.status(201).json(results);
             } else {
-                // Sayı değerlerini normalize et (virgülleri noktalara çevir)
+                // Sayı değerlerini nveyamalize et (virgülleri noktalara çevir)
                 data = normalizeData(data);
 
                 // Veri onaylandıktan sonra boş olabilir mi kontrol et
@@ -2269,23 +2269,23 @@ for (const table of tables) {
                   console.log(`✅ Removed uretim_suresi field for tavli_netsis_ym_stp_recete`);
                 }
 
-                // ✅ FIX: Rename recete_toplama to recete_top for gal_cost_cal_ym_st_recete
+                // ✅ FIX: Rename recete_aplama a recete_ap için gal_cost_cal_ym_st_recete
                 if (table === 'gal_cost_cal_ym_st_recete' && data.recete_toplama !== undefined) {
                   data.recete_top = data.recete_toplama;
                   delete data.recete_toplama;
                   console.log(`✅ Renamed recete_toplama → recete_top for gal_cost_cal_ym_st_recete`);
                 }
 
-                // ✅ FIX: Default ozel_saha fields to 0/"" for gal_cost_cal_ym_st
+                // ✅ FIX: Default ozel_saha fields a 0/"" için gal_cost_cal_ym_st
                 if (table === 'gal_cost_cal_ym_st') {
-                  // Default numeric ozel_saha fields to 0 if not provided
+                  // Default numeric ozel_saha fields a 0 if not provided
                   for (let i = 2; i <= 8; i++) {
                     const fieldName = `ozel_saha_${i}_say`;
                     if (data[fieldName] === undefined || data[fieldName] === null || data[fieldName] === '') {
                       data[fieldName] = 0;
                     }
                   }
-                  // Default alphanumeric ozel_saha fields to "" if not provided
+                  // Default alphanumeric ozel_saha fields a "" if not provided
                   for (let i = 1; i <= 8; i++) {
                     const fieldName = `ozel_saha_${i}_alf`;
                     if (data[fieldName] === undefined || data[fieldName] === null) {
@@ -2326,14 +2326,14 @@ for (const table of tables) {
                     console.log(`✅ Reçete başarıyla eklendi: ${table}, ID: ${result.rows[0].id}`);
                   }
                   
-                  // Add notification for Galvaniz Talebi
+                  // Add notification için Galvaniz Talebi
                   if (table === 'gal_cost_cal_sal_requests' && result.rows[0]) {
                     try {
                       const notificationQuery = `
                         INSERT INTO crm_notifications (user_id, title, message, type, icon, action_link) 
                         VALUES ($1, $2, $3, $4, $5, $6)
                       `;
-                      // Get username from session or use created_by field
+                      // Get username den session veya use Oluşturd_ile field
                       const username = data.created_by || data.username || 'admin';
                       
                       await pool.query(notificationQuery, [
@@ -2345,7 +2345,7 @@ for (const table of tables) {
                         `/satis/galvaniz-talebi/${result.rows[0].id}`
                       ]);
                       
-                      // Send email notification - wrapped in try-catch to not break the flow
+                      // Send email notification - wrapped in try-catch a not break the flow
                       try {
                         const https = require('https');
                         const emailData = JSON.stringify({
@@ -2389,7 +2389,7 @@ for (const table of tables) {
                     }
                   }
                   
-                  // REDIS CACHE INVALIDATION - Clear cache when data is added
+                  // REDIS Önbellek GeçersizATION - Clear Önbellek when data is added
                   if (table.includes('celik_hasir')) {
                     await cacheHelpers.clearTableCache(table);
                     console.log(`🗑️ Cache cleared for table: ${table}`);
@@ -2458,18 +2458,18 @@ for (const table of tables) {
     });
 }
 
-// SPECIAL ENDPOINT: Get all IDs matching filters (for "Tümünü Seç" functionality)
+// SPECIAL Endpoint: Tümünü getir IDs matching Filtreles (için "Tümünü Seç" functionality)
 for (const table of tables) {
     app.get(`/api/${table}/ids`, async (req, res) => {
         try {
-            // Use same filtering logic but only return IDs
+            // Use same Filtreleing logic but only Döndür IDs
             const { hasir_tipi, boy_cap, en_cap, uzunluk_boy, uzunluk_en, goz_araligi, stok_adi_like } = req.query;
             
             let query = `SELECT id FROM ${table}`;
             const queryParams = [];
             let whereConditions = [];
             
-            // Apply same filters as main GET endpoint
+            // Apply same Filtreles as main GET Endpoint
             if (table.includes('celik_hasir')) {
                 if (hasir_tipi) {
                     whereConditions.push(`hasir_tipi = $${queryParams.length + 1}`);
@@ -2537,7 +2537,7 @@ for (const table of tables) {
         try {
             const { id } = req.params;
             
-            // Console log to debug the request
+            // Console log a debug the İstek
             console.log(`🔄 PUT Request to ${table}/${id}`);
             console.log("🧾 Request Body:", JSON.stringify(req.body));
             
@@ -2548,7 +2548,7 @@ for (const table of tables) {
               return res.status(400).json({ error: validation.error });
             }
             
-            // Sayı değerlerini normalize et (virgülleri noktalara çevir)
+            // Sayı değerlerini nveyamalize et (virgülleri noktalara çevir)
             let data = normalizeData(req.body);
             
             // Eğer data boş ise hata döndür
@@ -2634,7 +2634,7 @@ async function deleteRelatedRecords(table, id) {
     // MM GT siliniyorsa, ilgili YM GT ve ilişkili reçeteleri sil
     if (table === 'gal_cost_cal_mm_gt') {
       try {
-        // Önce MM GT'nin stok_kodu'nu al
+        // Önce MM GT'nin sak_kodu'nu al
         const mmGtResult = await pool.query('SELECT stok_kodu FROM gal_cost_cal_mm_gt WHERE id = $1', [id]);
         if (mmGtResult.rows.length === 0) {
           console.log('⚠️ MM GT bulunamadı');
@@ -2684,7 +2684,7 @@ async function deleteRelatedRecords(table, id) {
       }
     }
     
-    // YM GT siliniyorsa, ilişkili reçeteleri sil
+    // YM GT siliniyveyasa, ilişkili reçeteleri sil
     if (table === 'gal_cost_cal_ym_gt') {
       try {
         const deletedRecipes = await pool.query('DELETE FROM gal_cost_cal_ym_gt_recete WHERE ym_gt_id = $1', [id]);
@@ -2694,24 +2694,24 @@ async function deleteRelatedRecords(table, id) {
       }
     }
 
-    // ✅ RE-ENABLED: CASCADE DELETE for YM ST (now with frontend confirmation dialog)
-    // Deleting YM ST should cascade delete:
-    // - YM ST recipes
-    // - YM STP stock + recipes (if exists)
+    // ✅ RE-ENABLED: Kaskad Sil için YM ST (now ile frontend confirmation dialog)
+    // Deleting YM ST should Kaskad Sil:
+    // - YM ST Reçetes
+    // - YM STP sack + Reçetes (Varsa)
     if (table === 'gal_cost_cal_ym_st') {
       try {
-        // Get YM ST stock code first
+        // Get YM ST sack code first
         const ymStResult = await pool.query('SELECT stok_kodu FROM gal_cost_cal_ym_st WHERE id = $1', [id]);
         if (ymStResult.rows.length > 0) {
           const ymStStokKodu = ymStResult.rows[0].stok_kodu;
           console.log(`🗑️ Cascading delete for YM ST: ${ymStStokKodu}`);
 
-          // 1. Delete YM ST recipes
+          // 1. Sil YM ST Reçetes
           const deletedRecipes = await pool.query('DELETE FROM gal_cost_cal_ym_st_recete WHERE ym_st_id = $1', [id]);
           console.log(`✅ YM ST recipes deleted: ${deletedRecipes.rowCount}`);
 
-          // 2. Delete YM STP if exists (YM STP format: YM.ST.XXXX.YYYY.ZZZZ.P)
-          // YM STP is created from YM ST by adding .P suffix
+          // 2. Sil YM STP Varsa (YM STP içinmat: YM.ST.XXXX.YYYY.ZZZZ.P)
+          // YM STP is Oluşturd den YM ST ile adding .P suffix
           const ymStpStokKodu = `${ymStStokKodu}.P`;
           const ymStpResult = await pool.query('SELECT id FROM tavli_netsis_ym_stp WHERE stok_kodu = $1', [ymStpStokKodu]);
 
@@ -2719,11 +2719,11 @@ async function deleteRelatedRecords(table, id) {
             const ymStpId = ymStpResult.rows[0].id;
             console.log(`🗑️ Found YM STP to delete: ${ymStpStokKodu}`);
 
-            // Delete YM STP recipes first
+            // Sil YM STP Reçetes first
             const deletedStpRecipes = await pool.query('DELETE FROM tavli_netsis_ym_stp_recete WHERE mamul_kodu = $1', [ymStpStokKodu]);
             console.log(`✅ YM STP recipes deleted: ${deletedStpRecipes.rowCount}`);
 
-            // Delete YM STP stock
+            // Sil YM STP sack
             await pool.query('DELETE FROM tavli_netsis_ym_stp WHERE id = $1', [ymStpId]);
             console.log(`✅ YM STP deleted: ${ymStpStokKodu}`);
           } else {
@@ -2735,7 +2735,7 @@ async function deleteRelatedRecords(table, id) {
       }
     }
 
-    // Çelik Hasır MM siliniyorsa, ilişkili reçeteleri sil
+    // Çelik Hasır MM siliniyveyasa, ilişkili reçeteleri sil
     if (table === 'celik_hasir_netsis_mm') {
       try {
         const deletedRecipes = await pool.query('DELETE FROM celik_hasir_netsis_mm_recete WHERE mm_id = $1', [id]);
@@ -2745,7 +2745,7 @@ async function deleteRelatedRecords(table, id) {
       }
     }
     
-    // Çelik Hasır NCBK siliniyorsa, ilişkili reçeteleri sil
+    // Çelik Hasır NCBK siliniyveyasa, ilişkili reçeteleri sil
     if (table === 'celik_hasir_netsis_ym_ncbk') {
       try {
         const deletedRecipes = await pool.query('DELETE FROM celik_hasir_netsis_ncbk_recete WHERE ncbk_id = $1', [id]);
@@ -2755,7 +2755,7 @@ async function deleteRelatedRecords(table, id) {
       }
     }
     
-    // Çelik Hasır NTEL siliniyorsa, ilişkili reçeteleri sil
+    // Çelik Hasır NTEL siliniyveyasa, ilişkili reçeteleri sil
     if (table === 'celik_hasir_netsis_ym_ntel') {
       try {
         const deletedRecipes = await pool.query('DELETE FROM celik_hasir_netsis_ntel_recete WHERE ntel_id = $1', [id]);
@@ -2774,11 +2774,11 @@ async function deleteRelatedRecords(table, id) {
   }
 }
 
-// BULK DELETION ENDPOINTS FOR OPTIMIZED PERFORMANCE
-// These endpoints provide efficient bulk deletion by stok_kodu/mamul_kodu
-// They are designed to replace the slow individual deletion pattern
+// Toplu DELETION EndpointS için OPTIMIZED PERiçinMANCE
+// These Endpoints provide efficient Toplu deletion ile sak_kodu/mamul_kodu
+// They are designed a replace the slow individual deletion pattern
 
-// Bulk delete recipes by mamul_kodu (for all recipe tables)
+// Toplu Sil Reçetes ile mamul_kodu (için Tüm Reçete Tablos)
 app.delete('/api/celik_hasir_netsis_mm_recete/bulk-delete-by-mamul', async (req, res) => {
   const client = await pool.connect();
   try {
@@ -2881,7 +2881,7 @@ app.delete('/api/celik_hasir_netsis_ntel_recete/bulk-delete-by-mamul', async (re
   }
 });
 
-// Bulk delete products by stok_kodu (for all product tables)
+// Toplu Sil Ürüns ile sak_kodu (için Tüm Ürün Tablos)
 app.delete('/api/celik_hasir_netsis_mm/bulk-delete-by-stok', async (req, res) => {
   const client = await pool.connect();
   try {
@@ -2893,25 +2893,25 @@ app.delete('/api/celik_hasir_netsis_mm/bulk-delete-by-stok', async (req, res) =>
     await client.query('BEGIN');
     console.log(`🗑️ Bulk deleting MM products for stok_kodu: ${stok_kodu}`);
 
-    // First delete related recipes
+    // First Sil İlişkili Reçetes
     const recipeResult = await client.query(
       'DELETE FROM celik_hasir_netsis_mm_recete WHERE mamul_kodu = $1',
       [stok_kodu]
     );
 
-    // Then delete the product
+    // Then Sil the Ürün
     const productResult = await client.query(
       'DELETE FROM celik_hasir_netsis_mm WHERE stok_kodu = $1',
       [stok_kodu]
     );
 
-    // Update sequence table after deletion if this is an OZL product
+    // Güncelle sequence Tablo after deletion if this is an OZL Ürün
     if (stok_kodu.startsWith('CHOZL')) {
       try {
-        // Extract sequence number from stok_kodu (e.g., CHOZL2450 -> 2450)
+        // Extract sequence number den sak_kodu (e.g., CHOZL2450 -> 2450)
         const sequenceMatch = stok_kodu.match(/CHOZL(\d+)/);
         if (sequenceMatch) {
-          // Find the highest remaining sequence number for OZL products
+          // Find the highest remaining sequence number için OZL Ürüns
           const maxSeqResult = await client.query(`
             SELECT COALESCE(MAX(CAST(SUBSTRING(stok_kodu FROM 'CHOZL(\\d+)') AS INTEGER)), 0) as max_seq
             FROM celik_hasir_netsis_mm 
@@ -2920,7 +2920,7 @@ app.delete('/api/celik_hasir_netsis_mm/bulk-delete-by-stok', async (req, res) =>
           
           const newMaxSeq = maxSeqResult.rows[0].max_seq;
           
-          // Update both OZL and OZL_BACKUP sequences
+          // Güncelle both OZL ve OZL_BACKUP sequences
           await client.query(`
             UPDATE celik_hasir_netsis_sequence 
             SET last_sequence = $1, updated_at = NOW()
@@ -2931,7 +2931,7 @@ app.delete('/api/celik_hasir_netsis_mm/bulk-delete-by-stok', async (req, res) =>
         }
       } catch (seqError) {
         console.error('❌ Sequence update error (non-critical):', seqError.message);
-        // Don't fail the deletion if sequence update fails
+        // Don't fail the deletion if sequence Güncelle fails
       }
     }
 
@@ -2967,13 +2967,13 @@ app.delete('/api/celik_hasir_netsis_ym_ncbk/bulk-delete-by-stok', async (req, re
     await client.query('BEGIN');
     console.log(`🗑️ Bulk deleting NCBK products for stok_kodu: ${stok_kodu}`);
 
-    // First delete related recipes
+    // First Sil İlişkili Reçetes
     const recipeResult = await client.query(
       'DELETE FROM celik_hasir_netsis_ncbk_recete WHERE mamul_kodu = $1',
       [stok_kodu]
     );
 
-    // Then delete the product
+    // Then Sil the Ürün
     const productResult = await client.query(
       'DELETE FROM celik_hasir_netsis_ym_ncbk WHERE stok_kodu = $1',
       [stok_kodu]
@@ -3010,13 +3010,13 @@ app.delete('/api/celik_hasir_netsis_ym_ntel/bulk-delete-by-stok', async (req, re
     await client.query('BEGIN');
     console.log(`🗑️ Bulk deleting NTEL products for stok_kodu: ${stok_kodu}`);
 
-    // First delete related recipes
+    // First Sil İlişkili Reçetes
     const recipeResult = await client.query(
       'DELETE FROM celik_hasir_netsis_ntel_recete WHERE mamul_kodu = $1',
       [stok_kodu]
     );
 
-    // Then delete the product
+    // Then Sil the Ürün
     const productResult = await client.query(
       'DELETE FROM celik_hasir_netsis_ym_ntel WHERE stok_kodu = $1',
       [stok_kodu]
@@ -3042,17 +3042,17 @@ app.delete('/api/celik_hasir_netsis_ym_ntel/bulk-delete-by-stok', async (req, re
   }
 });
 
-// Bulk delete all products and recipes for a specific type
+// Toplu Sil Tüm Ürüns ve Reçetes için a specific type
 app.delete('/api/celik_hasir_netsis_mm/bulk-delete-all', async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
     console.log(`🗑️ Bulk deleting ALL MM products and recipes`);
 
-    // First delete all recipes
+    // First Sil Tüm Reçetes
     const recipeResult = await client.query('DELETE FROM celik_hasir_netsis_mm_recete');
 
-    // Then delete all products
+    // Then Sil Tüm Ürüns
     const productResult = await client.query('DELETE FROM celik_hasir_netsis_mm');
 
     await client.query('COMMIT');
@@ -3080,10 +3080,10 @@ app.delete('/api/celik_hasir_netsis_ym_ncbk/bulk-delete-all', async (req, res) =
     await client.query('BEGIN');
     console.log(`🗑️ Bulk deleting ALL NCBK products and recipes`);
 
-    // First delete all recipes
+    // First Sil Tüm Reçetes
     const recipeResult = await client.query('DELETE FROM celik_hasir_netsis_ncbk_recete');
 
-    // Then delete all products
+    // Then Sil Tüm Ürüns
     const productResult = await client.query('DELETE FROM celik_hasir_netsis_ym_ncbk');
 
     await client.query('COMMIT');
@@ -3111,10 +3111,10 @@ app.delete('/api/celik_hasir_netsis_ym_ntel/bulk-delete-all', async (req, res) =
     await client.query('BEGIN');
     console.log(`🗑️ Bulk deleting ALL NTEL products and recipes`);
 
-    // First delete all recipes
+    // First Sil Tüm Reçetes
     const recipeResult = await client.query('DELETE FROM celik_hasir_netsis_ntel_recete');
 
-    // Then delete all products
+    // Then Sil Tüm Ürüns
     const productResult = await client.query('DELETE FROM celik_hasir_netsis_ym_ntel');
 
     await client.query('COMMIT');
@@ -3162,7 +3162,7 @@ for (const table of tables) {
             
             await client.query('COMMIT');
             
-            // REDIS CACHE INVALIDATION - Clear cache when data is deleted
+            // REDIS Önbellek GeçersizATION - Clear Önbellek when data is Sild
             if (table.includes('celik_hasir')) {
               await cacheHelpers.clearTableCache(table);
               console.log(`🗑️ Cache cleared for table: ${table} (delete operation)`);
@@ -3190,7 +3190,7 @@ app.get('/api/debug/table/:table', async (req, res) => {
       return res.status(400).json({ error: 'Geçersiz tablo adı' });
     }
     
-    // Tablo yapısını al
+    // Tablo yAPIsını al
     const query = `
       SELECT 
         column_name, 
@@ -3221,7 +3221,7 @@ app.get('/api/debug/table/:table', async (req, res) => {
   }
 });
 
-// Tüm timestamp alanlarını timestamptz'ye çeviren admin endpoint'i
+// Tüm timestamp alanlarını timestamptz'ye çeviren admin Endpoint'i
 app.post('/api/admin/update-timestamp-columns', async (req, res) => {
   const client = await pool.connect();
   try {
@@ -3296,13 +3296,13 @@ app.get('/api/gal_cost_cal_sequence/next', async (req, res) => {
       return res.status(400).json({ error: 'kod_2 ve cap parametreleri gerekli' });
     }
     
-    // Virgüllü cap değerini noktalı formata dönüştür
+    // Virgüllü cap değerini noktalı içinmata dönüştür
     let normalizedCap = cap;
     if (typeof cap === 'string' && cap.includes(',')) {
       normalizedCap = cap.replace(/,/g, '.');
     }
     
-    // Formatı kontrol et - 5 decimal places
+    // içinmatı kontrol et - 5 decimal places
     const formattedCap = parseFloat(normalizedCap).toFixed(5).replace('.', '').padStart(7, '0');
     
     // Bu kombinasyon için en yüksek sıra numarasını bul
@@ -3317,7 +3317,7 @@ app.get('/api/gal_cost_cal_sequence/next', async (req, res) => {
       nextSeq = result.rows[0].max_seq + 1;
     }
     
-    // 2 basamaklı sıra numarası formatı
+    // 2 basamaklı sıra numarası içinmatı
     const formattedSeq = nextSeq.toString().padStart(2, '0');
     
     res.json({ 
@@ -3362,7 +3362,7 @@ app.post('/api/bulk-import/tlc-hizlar', async (req, res) => {
     // Her bir veriyi ekle
     for (const item of data) {
       try {
-        // Sayısal değerleri normalize et
+        // Sayısal değerleri nveyamalize et
         const normalizedItem = normalizeData(item);
         
         // giris_capi, cikis_capi ve calisma_hizi zorunlu alanlar
@@ -3427,7 +3427,7 @@ app.post('/api/bulk-import/tlc-hizlar', async (req, res) => {
   }
 });
 
-// ISOLATED EMAIL ENDPOINT - Galvanizli Tel Request Notification
+// ISOLATED EMAIL Endpoint - Galvanizli Tel İstek Notification
 // This endpoint is completely isolated to prevent any issues with the rest of the backend
 app.post('/api/send-galvaniz-notification', async (req, res) => {
   console.log('📧 Galvaniz talep bildirimi gönderme isteği alındı');
@@ -3445,10 +3445,10 @@ app.post('/api/send-galvaniz-notification', async (req, res) => {
       throw new Error('Resend API key not configured');
     }
     
-    // Use direct HTTPS request to Resend API
+    // Use direct HTTPS İstek a Resend API
     const https = require('https');
     
-    // Format the request data for email with professional design
+    // içinmat the İstek data için email ile professional design
     const formattedData = `
       <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 650px; margin: 0 auto; background-color: #ffffff;">
         <!-- Header with Logo -->
@@ -3559,7 +3559,7 @@ app.post('/api/send-galvaniz-notification', async (req, res) => {
     
     
     // ===== RESEND IMPLEMENTATION (ACTIVE) =====
-    // Prepare email data for Resend API
+    // Prepare email data için Resend API
     const emailData = {
       from: 'ALB CRM System <onboarding@resend.dev>', // Using Resend's test domain
       to: ['albcrm01@gmail.com'], // Your email
@@ -3575,7 +3575,7 @@ app.post('/api/send-galvaniz-notification', async (req, res) => {
       `
     };
     
-    // Make direct API call to Resend
+    // Make direct API cTüm a Resend
     const options = {
       hostname: 'api.resend.com',
       path: '/emails',
@@ -3586,7 +3586,7 @@ app.post('/api/send-galvaniz-notification', async (req, res) => {
       }
     };
     
-    // Create promise for the API call
+    // Oluştur promise için the API cTüm
     const sendEmail = new Promise((resolve, reject) => {
       const request = https.request(options, (response) => {
         let data = '';
@@ -3611,12 +3611,12 @@ app.post('/api/send-galvaniz-notification', async (req, res) => {
         reject(error);
       });
       
-      // Send the request
+      // Send the İstek
       request.write(JSON.stringify(emailData));
       request.end();
     });
     
-    // Wait for email to be sent
+    // Wait için email a be sent
     await sendEmail;
     
     res.status(200).json({ 
@@ -3626,10 +3626,10 @@ app.post('/api/send-galvaniz-notification', async (req, res) => {
     });
     
   } catch (error) {
-    // Log error but don't break the main flow
+    // Log errveya but don't break the main flow
     console.error('⚠️ Email gönderme hatası (ignored):', error.message);
     
-    // Still return success to not break the request creation
+    // Still Döndür Başarılı a not break the İstek creation
     res.status(200).json({ 
       success: true, 
       emailSent: false,
@@ -3639,27 +3639,27 @@ app.post('/api/send-galvaniz-notification', async (req, res) => {
   }
 });
 
-// Import new API endpoints
+// Impveyat new API Endpoints
 const crmEndpoints = require('./api-endpoints');
 app.locals.pool = pool; // Make pool available to endpoints
 app.use(crmEndpoints);
 
 // Yerel geliştirme için Sunucu Başlatma
-// Add dedicated export endpoint for large datasets
+// Add dedicated expveyat Endpoint için large datasets
 app.get('/api/export/:table', async (req, res) => {
     const { table } = req.params;
     const client = await pool.connect();
     
     try {
-        // Set longer timeout for export operations
+        // Set longer timeout için expveyat operations
         await client.query('SET statement_timeout = 120000'); // 2 minutes
         
-        // Build query with filters if provided
+        // Build Sorgu ile Filtreles if provided
         let query = `SELECT * FROM ${table}`;
         const queryParams = [];
         const whereConditions = [];
         
-        // Add any filters from query parameters
+        // Add any Filtreles den Sorgu parameters
         const { ids, hasir_tipi, stok_kodu_like } = req.query;
         
         if (ids) {
@@ -3688,7 +3688,7 @@ app.get('/api/export/:table', async (req, res) => {
         
         const result = await client.query(query, queryParams);
         
-        // Return data optimized for Excel export
+        // Döndür data optimized için Excel expveyat
         res.setHeader('Content-Type', 'application/json');
         res.setHeader('X-Total-Count', result.rows.length);
         res.json({
@@ -3716,14 +3716,14 @@ app.get('/api/export/:table', async (req, res) => {
     }
 });
 
-// CH Sequence reset endpoint
+// CH Sequence reset Endpoint
 app.post('/api/celik_hasir_netsis_sequence/reset-ch-sequences', async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
     console.log(`🔄 Resetting CH sequences`);
 
-    // Reset OZL and OZL_BACKUP sequences to 0
+    // Reset OZL ve OZL_BACKUP sequences a 0
     const ozlResult = await client.query(`
       UPDATE celik_hasir_netsis_sequence 
       SET sequence = 0, updated_at = NOW()
@@ -3754,7 +3754,7 @@ app.post('/api/celik_hasir_netsis_sequence/reset-ch-sequences', async (req, res)
   }
 });
 
-// Add health check endpoint for monitoring
+// Add health check Endpoint için moniaring
 app.get('/api/health', async (req, res) => {
     try {
         const result = await pool.query('SELECT NOW()');
@@ -3775,7 +3775,7 @@ app.get('/api/health', async (req, res) => {
     }
 });
 
-// 🧹 Manual Database Connection Cleanup Endpoint
+// 🧹 Manual Veritabanı Connection Cleanup Endpoint
 app.post('/api/maintenance/cleanup-connections', async (req, res) => {
     try {
         const result = await pool.query(`
@@ -3806,11 +3806,11 @@ app.post('/api/maintenance/cleanup-connections', async (req, res) => {
     }
 });
 
-// ===== GALVANIZLI TEL BULK ENDPOINTS FOR EXCEL GENERATION =====
-// These endpoints provide fast bulk access for Excel generation functionality
-// Similar to Çelik Hasır pattern but for Galvanizli Tel products
+// ===== GALVANIZLI TEL Toplu EndpointS için EXCEL GENERATION =====
+// These Endpoints provide fast Toplu access için Excel generation functionality
+// Similar a Çelik Hasır pattern but için Galvanizli Tel Ürüns
 
-// Bulk endpoint for all MM GT products
+// Toplu Endpoint için Tüm MM GT Ürüns
 app.get('/api/gal_cost_cal_mm_gt/bulk-all', async (req, res) => {
   try {
     console.log('📊 BULK: Fetching all MM GT products for Excel generation...');
@@ -3828,7 +3828,7 @@ app.get('/api/gal_cost_cal_mm_gt/bulk-all', async (req, res) => {
   }
 });
 
-// Bulk endpoint for all YM GT products
+// Toplu Endpoint için Tüm YM GT Ürüns
 app.get('/api/gal_cost_cal_ym_gt/bulk-all', async (req, res) => {
   try {
     console.log('📊 BULK: Fetching all YM GT products for Excel generation...');
@@ -3846,7 +3846,7 @@ app.get('/api/gal_cost_cal_ym_gt/bulk-all', async (req, res) => {
   }
 });
 
-// Bulk endpoint for all YM ST products
+// Toplu Endpoint için Tüm YM ST Ürüns
 app.get('/api/gal_cost_cal_ym_st/bulk-all', async (req, res) => {
   try {
     console.log('📊 BULK: Fetching all YM ST products for Excel generation...');
@@ -3864,7 +3864,7 @@ app.get('/api/gal_cost_cal_ym_st/bulk-all', async (req, res) => {
   }
 });
 
-// Bulk endpoint for all MM GT recipes
+// Toplu Endpoint için Tüm MM GT Reçetes
 app.get('/api/gal_cost_cal_mm_gt_recete/bulk-all', async (req, res) => {
   try {
     console.log('📊 BULK: Fetching all MM GT recipes for Excel generation...');
@@ -3882,7 +3882,7 @@ app.get('/api/gal_cost_cal_mm_gt_recete/bulk-all', async (req, res) => {
   }
 });
 
-// Bulk endpoint for all YM GT recipes
+// Toplu Endpoint için Tüm YM GT Reçetes
 app.get('/api/gal_cost_cal_ym_gt_recete/bulk-all', async (req, res) => {
   try {
     console.log('📊 BULK: Fetching all YM GT recipes for Excel generation...');
@@ -3900,7 +3900,7 @@ app.get('/api/gal_cost_cal_ym_gt_recete/bulk-all', async (req, res) => {
   }
 });
 
-// Bulk endpoint for all YM ST recipes
+// Toplu Endpoint için Tüm YM ST Reçetes
 app.get('/api/gal_cost_cal_ym_st_recete/bulk-all', async (req, res) => {
   try {
     console.log('📊 BULK: Fetching all YM ST recipes for Excel generation...');
@@ -3918,13 +3918,13 @@ app.get('/api/gal_cost_cal_ym_st_recete/bulk-all', async (req, res) => {
   }
 });
 
-// ✅ NEW: Bulk delete endpoint for YM ST recipes by stok_kodu
+// ✅ NEW: Toplu Sil Endpoint için YM ST Reçetes ile sak_kodu
 app.delete('/api/gal_cost_cal_ym_st_recete/bulk/:stok_kodu', async (req, res) => {
   try {
     const { stok_kodu } = req.params;
     console.log(`🗑️ BULK DELETE: Deleting YM ST recipes for stok_kodu: ${stok_kodu}`);
 
-    // First, look up the ym_st_id from stok_kodu
+    // First, look up the ym_st_id den sak_kodu
     const ymStLookup = await pool.query(
       'SELECT id FROM gal_cost_cal_ym_st WHERE stok_kodu = $1',
       [stok_kodu]
@@ -3939,7 +3939,7 @@ app.delete('/api/gal_cost_cal_ym_st_recete/bulk/:stok_kodu', async (req, res) =>
 
     const ymStId = ymStLookup.rows[0].id;
 
-    // Delete all recipes for this ym_st_id
+    // Sil Tüm Reçetes için this ym_st_id
     const result = await pool.query(
       'DELETE FROM gal_cost_cal_ym_st_recete WHERE ym_st_id = $1',
       [ymStId]
@@ -3959,7 +3959,7 @@ app.delete('/api/gal_cost_cal_ym_st_recete/bulk/:stok_kodu', async (req, res) =>
 });
 
 // =====================================================
-// PRODUCTION PLANNING ENDPOINTS (Steel Mesh)
+// ÜrünION PLANNING EndpointS (Steel Mesh)
 // =====================================================
 
 // Add multer for file uploads
@@ -3978,7 +3978,7 @@ const upload = multer({
   }
 });
 
-// Create new production planning session
+// Oluştur new Ürünion planning session
 app.post('/api/celik-hasir-planlama/sessions', async (req, res) => {
   try {
     const { name, description, max_schedule_days = 30, include_stock_products = true } = req.body;
@@ -3995,7 +3995,7 @@ app.post('/api/celik-hasir-planlama/sessions', async (req, res) => {
   }
 });
 
-// Get all sessions
+// Tümünü getir sessions
 app.get('/api/celik-hasir-planlama/sessions', async (req, res) => {
   try {
     const result = await pool.query(`
@@ -4010,7 +4010,7 @@ app.get('/api/celik-hasir-planlama/sessions', async (req, res) => {
   }
 });
 
-// Get stock product specifications from celik_hasir_netsis_mm table
+// Get sack Ürün specifications den celik_hasir_netsis_mm Tablo
 app.get('/api/celik-hasir-planlama/stock/:stokKodu', async (req, res) => {
   try {
     const { stokKodu } = req.params;
@@ -4045,19 +4045,19 @@ app.get('/api/celik-hasir-planlama/stock/:stokKodu', async (req, res) => {
   }
 });
 
-// Excel/CSV upload and processing with enhanced data integration
+// Excel/CSV upload ve İşleing ile enhanced data integration
 app.post('/api/celik-hasir-planlama/upload', upload.single('file'), async (req, res) => {
   try {
     const { session_id, orders, total_orders } = req.body;
 
-    // Handle direct JSON data upload (from new simplified upload module)
+    // Hvele direct JSON data upload (den new simplified upload module)
     if (orders && Array.isArray(orders)) {
-      // Process orders with stock table integration
+      // İşle veyaders ile sack Tablo integration
       const enrichedOrders = [];
 
       for (const order of orders) {
         try {
-          // Get product specs from stock table
+          // Get Ürün specs den sack Tablo
           const stockResult = await pool.query(`
             SELECT
               stok_kodu,
@@ -4079,10 +4079,10 @@ app.post('/api/celik-hasir-planlama/upload', upload.single('file'), async (req, 
 
           const stockData = stockResult.rows[0];
 
-          // Enrich order with stock data
+          // Enrich veyader ile sack data
           const enrichedOrder = {
             ...order,
-            // Use stock data if available, fallback to CSV data
+            // Use sack data if available, fTümback a CSV data
             boy: stockData ? parseInt(stockData.ebat_boy) : order.boy,
             en: stockData ? parseInt(stockData.ebat_en) : order.en,
             boy_cap: stockData ? parseFloat(stockData.cap) : order.boy_cap,
@@ -4091,7 +4091,7 @@ app.post('/api/celik-hasir-planlama/upload', upload.single('file'), async (req, 
             cubuk_sayisi_boy: stockData ? parseInt(stockData.cubuk_sayisi_boy) : null,
             cubuk_sayisi_en: stockData ? parseInt(stockData.cubuk_sayisi_en) : null,
             dis_cap_en_cubuk_ad: stockData ? parseInt(stockData.dis_cap_en_cubuk_ad) : null,
-            // Use CSV weight if available, otherwise stock weight
+            // Use CSV weight if available, otherwise sack weight
             birim_agirlik: order.birim_agirlik || (stockData ? parseFloat(stockData.stock_birim_agirlik) : 0),
             has_stock_data: !!stockData
           };
@@ -4099,17 +4099,17 @@ app.post('/api/celik-hasir-planlama/upload', upload.single('file'), async (req, 
           enrichedOrders.push(enrichedOrder);
         } catch (error) {
           console.warn(`Stock lookup failed for ${order.stok_kodu}:`, error.message);
-          // Add order without stock enrichment
+          // Add veyader ileout sack enrichment
           enrichedOrders.push({ ...order, has_stock_data: false });
         }
       }
 
-      // Insert enriched orders into database
+      // Ekle enriched veyaders ina Veritabanı
       if (enrichedOrders.length > 0) {
-        // Delete existing orders for this session
+        // Sil existing veyaders için this session
         await pool.query('DELETE FROM celik_hasir_planlama_production_orders WHERE session_id = $1', [session_id]);
 
-        // Insert new orders
+        // Ekle new veyaders
         for (const order of enrichedOrders) {
           await pool.query(`
             INSERT INTO celik_hasir_planlama_production_orders (
@@ -4172,7 +4172,7 @@ app.post('/api/celik-hasir-planlama/upload', upload.single('file'), async (req, 
     const headers = jsonData[headerRowIdx];
     const dataRows = jsonData.slice(headerRowIdx + 1);
 
-    // Parse column mappings if provided
+    // Parse et column mappings if provided
     let mappings = {};
     if (column_mappings) {
       try {
@@ -4182,7 +4182,7 @@ app.post('/api/celik-hasir-planlama/upload', upload.single('file'), async (req, 
       }
     }
 
-    // Create column index mapping
+    // Oluştur column index mapping
     const getColumnIndex = (expectedColumn) => {
       // First try reverse mapping from user input (user maps Excel column -> System column)
       for (const [excelCol, systemCol] of Object.entries(mappings)) {
@@ -4195,7 +4195,7 @@ app.post('/api/celik-hasir-planlama/upload', upload.single('file'), async (req, 
       const directIndex = headers.indexOf(expectedColumn);
       if (directIndex !== -1) return directIndex;
 
-      // Finally try partial matching
+      // FinTümy try partial matching
       const lowerExpected = expectedColumn.toLowerCase();
       return headers.findIndex(h =>
         h && (h.toLowerCase().includes(lowerExpected) ||
@@ -4256,7 +4256,7 @@ app.post('/api/celik-hasir-planlama/upload', upload.single('file'), async (req, 
       }
     }
 
-    // Bulk insert products
+    // Toplu Ekle Ürüns
     if (products.length > 0) {
       const values = products.map(p => [
         p.session_id, p.siparis_tarihi, p.firma, p.stok_kodu, p.hasir_cinsi,
@@ -4295,12 +4295,12 @@ app.post('/api/celik-hasir-planlama/upload', upload.single('file'), async (req, 
   }
 });
 
-// Advanced production scheduling endpoint using ProductionScheduler
+// Advanced Ürünion scheduling Endpoint using ÜrünionScheduler
 app.post('/api/celik-hasir-planlama/schedule/:sessionId', async (req, res) => {
   try {
     const { sessionId } = req.params;
 
-    // Get orders for this session
+    // Get veyaders için this session
     const ordersResult = await pool.query(`
       SELECT * FROM celik_hasir_planlama_production_orders
       WHERE session_id = $1 AND is_regular_product = true
@@ -4312,7 +4312,7 @@ app.post('/api/celik-hasir-planlama/schedule/:sessionId', async (req, res) => {
       return res.json({ message: 'No orders to schedule' });
     }
 
-    // Get production speed matrix
+    // Get Ürünion speed matrix
     const speedsResult = await pool.query(`
       SELECT * FROM celik_hasir_planlama_production_speeds
     `);
@@ -4334,7 +4334,7 @@ app.post('/api/celik-hasir-planlama/schedule/:sessionId', async (req, res) => {
       changeoverMatrix[key] = row.changeover_minutes;
     });
 
-    // Initialize production scheduler
+    // Initialize Ürünion scheduler
     const ProductionScheduler = class {
       constructor() {
         this.machineConfig = {
@@ -4379,11 +4379,11 @@ app.post('/api/celik-hasir-planlama/schedule/:sessionId', async (req, res) => {
       calculateProductionTimes(diameterGroups, speedMatrix) {
         diameterGroups.forEach(group => {
           group.orders.forEach(order => {
-            // Enhanced production speed calculation using stock data
+            // Enhanced Ürünion speed calculation using sack data
             const diameter = order.diameter || order.primary_diameter || 4.5;
             const enAra = order.en_ara || 15;
 
-            // Try multiple speed matrix key formats
+            // Try Çoklu speed matrix key içinmats
             const keys = [
               `MG316_${diameter}_${enAra}`,
               `${diameter}_${enAra}`,
@@ -4399,14 +4399,14 @@ app.post('/api/celik-hasir-planlama/schedule/:sessionId', async (req, res) => {
               }
             }
 
-            // Apply stock-based adjustments if available
+            // Apply sack-based adjustments if available
             if (order.has_stock_data) {
-              // More complex products take longer
+              // Mveyae complex Ürüns Al longer
               if (order.dis_cap_en_cubuk_ad && order.dis_cap_en_cubuk_ad > 25) {
                 speed *= 0.85; // 15% slower for complex products
               }
 
-              // Larger mesh spacing = faster production
+              // Larger mesh spacing = faster Ürünion
               if (enAra > 20) speed *= 1.1;
               else if (enAra < 10) speed *= 0.9;
             }
@@ -4423,12 +4423,12 @@ app.post('/api/celik-hasir-planlama/schedule/:sessionId', async (req, res) => {
       calculateSetupTime(order, diameter) {
         let setupTime = 10; // Base setup time
 
-        // Complex products need more setup time
+        // Complex Ürüns need mveyae setup time
         if (order.has_stock_data && order.dis_cap_en_cubuk_ad > 20) {
           setupTime += 5;
         }
 
-        // Larger diameters need more setup time
+        // Larger diameters need mveyae setup time
         if (diameter > 8) setupTime += 5;
         else if (diameter < 5) setupTime -= 2;
 
@@ -4450,7 +4450,7 @@ app.post('/api/celik-hasir-planlama/schedule/:sessionId', async (req, res) => {
           let minTime = Infinity;
 
           if (group.totalQty > 50 || group.totalWeight > 1000) {
-            // Bulk orders go to tam otomatik
+            // Toplu veyaders go a tam oamatik
             for (const machine of ['MG316', 'EUROBEND']) {
               if (assignments[machine].totalTime < minTime) {
                 minTime = assignments[machine].totalTime;
@@ -4458,7 +4458,7 @@ app.post('/api/celik-hasir-planlama/schedule/:sessionId', async (req, res) => {
               }
             }
           } else {
-            // Smaller orders - find least loaded machine
+            // SmTümer veyaders - find least loaded machine
             for (const machine of machineOrder) {
               if (assignments[machine].totalTime < minTime) {
                 minTime = assignments[machine].totalTime;
@@ -4525,10 +4525,10 @@ app.post('/api/celik-hasir-planlama/schedule/:sessionId', async (req, res) => {
     const scheduler = new ProductionScheduler();
     const schedule = await scheduler.scheduleProduction(orders, speedMatrix, changeoverMatrix);
 
-    // Delete existing schedules for this session
+    // Sil existing schedules için this session
     await pool.query('DELETE FROM celik_hasir_planlama_production_schedules WHERE session_id = $1', [sessionId]);
 
-    // Insert optimized schedules
+    // Ekle optimized schedules
     let totalSchedules = 0;
     for (const [machineId, machineData] of Object.entries(schedule)) {
       for (const order of machineData.orders) {
@@ -4547,7 +4547,7 @@ app.post('/api/celik-hasir-planlama/schedule/:sessionId', async (req, res) => {
       }
     }
 
-    // Calculate analytics
+    // Hesapla analytics
     const analytics = {
       totalOrders: totalSchedules,
       machineUtilization: {}
@@ -4575,7 +4575,7 @@ app.post('/api/celik-hasir-planlama/schedule/:sessionId', async (req, res) => {
   }
 });
 
-// Get production schedules
+// Get Ürünion schedules
 app.get('/api/celik-hasir-planlama/schedules/:sessionId', async (req, res) => {
   try {
     const { sessionId } = req.params;
@@ -4628,7 +4628,7 @@ app.get('/api/celik-hasir-planlama/sessions/:sessionId', async (req, res) => {
   }
 });
 
-// Delete session
+// Sil session
 app.delete('/api/celik-hasir-planlama/sessions/:sessionId', async (req, res) => {
   try {
     const { sessionId } = req.params;
@@ -4643,7 +4643,7 @@ app.delete('/api/celik-hasir-planlama/sessions/:sessionId', async (req, res) => 
   }
 });
 
-// Get production orders for a session
+// Get Ürünion veyaders için a session
 app.get('/api/celik-hasir-planlama/orders/:sessionId', async (req, res) => {
   try {
     const { sessionId } = req.params;
@@ -4661,7 +4661,7 @@ app.get('/api/celik-hasir-planlama/orders/:sessionId', async (req, res) => {
   }
 });
 
-// Drag & drop reorder schedules
+// Drag & drop reveyader schedules
 app.put('/api/celik-hasir-planlama/schedules/reorder', async (req, res) => {
   try {
     const { scheduleId, newMachineId, newSequence, newDay } = req.body;
@@ -4679,7 +4679,7 @@ app.put('/api/celik-hasir-planlama/schedules/reorder', async (req, res) => {
   }
 });
 
-// Analytics endpoint
+// Analytics Endpoint
 app.get('/api/celik-hasir-planlama/analytics/:sessionId', async (req, res) => {
   try {
     const { sessionId } = req.params;
@@ -4720,7 +4720,7 @@ app.get('/api/celik-hasir-planlama/analytics/:sessionId', async (req, res) => {
   }
 });
 
-// Export schedules
+// Expveyat schedules
 app.get('/api/celik-hasir-planlama/export/:sessionId', async (req, res) => {
   try {
     const { sessionId } = req.params;
@@ -4753,8 +4753,8 @@ app.get('/api/celik-hasir-planlama/export/:sessionId', async (req, res) => {
 
 
 // ═══════════════════════════════════════════════════════════════
-// TAVLI NETSIS ENDPOINTS - CORRECTED for NO FOREIGN KEYS
-// Uses stok_kodu fields instead of ID fields
+// TAVLI NETSIS EndpointS - CveyaRECTED için NO içinEIGN KEYS
+// Uses sak_kodu fields instead of ID fields
 // ═══════════════════════════════════════════════════════════════
 
 // ==========================================
@@ -4780,7 +4780,7 @@ app.get('/api/tavli_netsis_ym_tt', async (req, res) => {
 
 app.post('/api/tavli_netsis_ym_tt', async (req, res) => {
   try {
-    // Extract ALL fields from request body
+    // Extract Tüm fields den İstek Gövde
     const fields = req.body;
     const result = await pool.query(
       `INSERT INTO tavli_netsis_ym_tt (
@@ -4835,7 +4835,7 @@ app.delete('/api/tavli_netsis_ym_tt/:id', async (req, res) => {
   } catch (err) { console.error('Error:', err); res.status(500).json({ error: err.message }); }
 });
 
-// YM TT Recipes
+// YM TT Reçetes
 app.get('/api/tavli_netsis_ym_tt_recete', async (req, res) => {
   try {
     const { ym_tt_stok_kodu, mamul_kodu, limit = 2000 } = req.query;
@@ -4867,7 +4867,7 @@ app.post('/api/tavli_netsis_ym_tt_recete', async (req, res) => {
     } catch (err) {
       console.error('❌ YM TT recipe save error:', err.message);
 
-      // Check if it's a max connections error
+      // Check if it's a max connections errveya
       if (err.message && err.message.includes('Max client connections reached') && retryCount < maxRetries) {
         console.log(`🚨 Max connections error detected, triggering emergency cleanup (attempt ${retryCount + 1}/${maxRetries + 1})`);
         await emergencyCleanup();
@@ -4876,7 +4876,7 @@ app.post('/api/tavli_netsis_ym_tt_recete', async (req, res) => {
         continue; // Retry
       }
 
-      // For other errors or max retries reached, return error
+      // için other errveyas veya max retries rHered, Döndür errveya
       res.status(500).json({ error: err.message });
       return;
     }
@@ -4977,7 +4977,7 @@ app.delete('/api/tavli_netsis_ym_yb/:id', async (req, res) => {
   } catch (err) { console.error('Error:', err); res.status(500).json({ error: err.message }); }
 });
 
-// YM YB Recipes
+// YM YB Reçetes
 app.get('/api/tavli_netsis_ym_yb_recete', async (req, res) => {
   try {
     const { ym_yb_stok_kodu, mamul_kodu, limit = 2000 } = req.query;
@@ -5071,7 +5071,7 @@ app.delete('/api/tavli_netsis_ym_stp/:id', async (req, res) => {
   } catch (err) { console.error('Error:', err); res.status(500).json({ error: err.message }); }
 });
 
-// YM STP Recipes
+// YM STP Reçetes
 app.get('/api/tavli_netsis_ym_stp_recete', async (req, res) => {
   try {
     const { ym_stp_stok_kodu, mamul_kodu, limit = 2000 } = req.query;
@@ -5103,7 +5103,7 @@ app.post('/api/tavli_netsis_ym_stp_recete', async (req, res) => {
     } catch (err) {
       console.error('❌ YM STP recipe save error:', err.message);
 
-      // Check if it's a max connections error
+      // Check if it's a max connections errveya
       if (err.message && err.message.includes('Max client connections reached') && retryCount < maxRetries) {
         console.log(`🚨 Max connections error detected, triggering emergency cleanup (attempt ${retryCount + 1}/${maxRetries + 1})`);
         await emergencyCleanup();
@@ -5112,7 +5112,7 @@ app.post('/api/tavli_netsis_ym_stp_recete', async (req, res) => {
         continue; // Retry
       }
 
-      // For other errors or max retries reached, return error
+      // için other errveyas veya max retries rHered, Döndür errveya
       res.status(500).json({ error: err.message });
       return;
     }
@@ -5128,7 +5128,7 @@ app.delete('/api/tavli_netsis_ym_stp_recete/:id', async (req, res) => {
 });
 
 // ==========================================
-// TAVLI/BALYA MM TT (Final Products)
+// TAVLI/BALYA MM TT (Final Ürüns)
 // ==========================================
 app.get('/api/tavli_balya_tel_mm', async (req, res) => {
   try {
@@ -5161,12 +5161,12 @@ app.post('/api/tavli_balya_tel_mm', async (req, res) => {
 app.delete('/api/tavli_balya_tel_mm/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    // First delete related recipes
+    // First Sil İlişkili Reçetes
     await pool.query(`
       DELETE FROM tavli_balya_tel_mm_recete
       WHERE mamul_kodu IN (SELECT stok_kodu FROM tavli_balya_tel_mm WHERE id = $1)
     `, [id]);
-    // Then delete the product
+    // Then Sil the Ürün
     const result = await pool.query('DELETE FROM tavli_balya_tel_mm WHERE id = $1 RETURNING *', [id]);
     if (result.rows.length === 0) return res.status(404).json({ error: 'Not found' });
     res.json({ message: 'Deleted successfully', deleted: result.rows[0] });
@@ -5174,7 +5174,7 @@ app.delete('/api/tavli_balya_tel_mm/:id', async (req, res) => {
 });
 
 // ==========================================
-// TAVLI/BALYA MM TT RECETE (Recipes)
+// TAVLI/BALYA MM TT RECETE (Reçetes)
 // ==========================================
 app.get('/api/tavli_balya_tel_mm_recete', async (req, res) => {
   try {
@@ -5182,7 +5182,7 @@ app.get('/api/tavli_balya_tel_mm_recete', async (req, res) => {
     let query = 'SELECT * FROM tavli_balya_tel_mm_recete';
     const params = [];
 
-    // ✅ FIXED: Support both mm_id and mamul_kodu filters
+    // ✅ FIXED: Suppveyat both mm_id ve mamul_kodu Filtreles
     if (mm_id) {
       query += ' WHERE mm_id = $1';
       params.push(mm_id);
@@ -5216,7 +5216,7 @@ app.post('/api/tavli_balya_tel_mm_recete', async (req, res) => {
     } catch (err) {
       console.error('❌ Recipe save error:', err.message);
 
-      // Check if it's a max connections error
+      // Check if it's a max connections errveya
       if (err.message && err.message.includes('Max client connections reached') && retryCount < maxRetries) {
         console.log(`🚨 Max connections error detected, triggering emergency cleanup (attempt ${retryCount + 1}/${maxRetries + 1})`);
         await emergencyCleanup();
@@ -5225,7 +5225,7 @@ app.post('/api/tavli_balya_tel_mm_recete', async (req, res) => {
         continue; // Retry
       }
 
-      // For other errors or max retries reached, return error
+      // için other errveyas veya max retries rHered, Döndür errveya
       const errorDetails = err.message.includes('Max client connections')
         ? 'Max client connections reached'
         : err.message;
@@ -5240,7 +5240,7 @@ app.post('/api/tavli_balya_tel_mm_recete', async (req, res) => {
 
 app.delete('/api/tavli_balya_tel_mm_recete/:id', async (req, res) => {
   try {
-    // ✅ OPTIMIZED: Use LIMIT 1 to stop after first match (faster)
+    // ✅ OPTIMIZED: Use Limit 1 a sap after first match (faster)
     const result = await pool.query(
       'DELETE FROM tavli_balya_tel_mm_recete WHERE id = $1 RETURNING id',
       [req.params.id]
@@ -5253,7 +5253,7 @@ app.delete('/api/tavli_balya_tel_mm_recete/:id', async (req, res) => {
   }
 });
 
-// ✅ NEW: Bulk delete endpoint for MM TT recipes
+// ✅ NEW: Toplu Sil Endpoint için MM TT Reçetes
 app.delete('/api/tavli_balya_tel_mm_recete/bulk/:mm_id', async (req, res) => {
   try {
     const { mm_id } = req.params;
@@ -5277,10 +5277,10 @@ app.delete('/api/tavli_balya_tel_mm_recete/bulk/:mm_id', async (req, res) => {
 });
 
 // ==========================================
-// BULK ENDPOINTS for Tavlı/Balya Tel Excel Generation
+// Toplu EndpointS için Tavlı/Balya Tel Excel Generation
 // ==========================================
 
-// Bulk endpoint for all Tavlı/Balya MM products
+// Toplu Endpoint için Tüm Tavlı/Balya MM Ürüns
 app.get('/api/tavli_balya_tel_mm/bulk-all', async (req, res) => {
   try {
     console.log('📊 BULK: Fetching all Tavlı/Balya MM TT products for Excel generation...');
@@ -5298,7 +5298,7 @@ app.get('/api/tavli_balya_tel_mm/bulk-all', async (req, res) => {
   }
 });
 
-// Bulk endpoint for all Tavlı/Balya MM recipes
+// Toplu Endpoint için Tüm Tavlı/Balya MM Reçetes
 app.get('/api/tavli_balya_tel_mm_recete/bulk-all', async (req, res) => {
   try {
     console.log('📊 BULK: Fetching all Tavlı/Balya MM TT recipes for Excel generation...');
@@ -5316,7 +5316,7 @@ app.get('/api/tavli_balya_tel_mm_recete/bulk-all', async (req, res) => {
   }
 });
 
-// Bulk endpoint for all YM TT products (intermediate - annealed)
+// Toplu Endpoint için Tüm YM TT Ürüns (intermediate - annealed)
 app.get('/api/tavli_netsis_ym_tt/bulk-all', async (req, res) => {
   try {
     console.log('📊 BULK: Fetching all YM TT products for Excel generation...');
@@ -5334,7 +5334,7 @@ app.get('/api/tavli_netsis_ym_tt/bulk-all', async (req, res) => {
   }
 });
 
-// Bulk endpoint for all YM TT recipes
+// Toplu Endpoint için Tüm YM TT Reçetes
 app.get('/api/tavli_netsis_ym_tt_recete/bulk-all', async (req, res) => {
   try {
     console.log('📊 BULK: Fetching all YM TT recipes for Excel generation...');
@@ -5352,7 +5352,7 @@ app.get('/api/tavli_netsis_ym_tt_recete/bulk-all', async (req, res) => {
   }
 });
 
-// Bulk endpoint for all YM STP products (intermediate - pressed)
+// Toplu Endpoint için Tüm YM STP Ürüns (intermediate - pressed)
 app.get('/api/tavli_netsis_ym_stp/bulk-all', async (req, res) => {
   try {
     console.log('📊 BULK: Fetching all YM STP products for Excel generation...');
@@ -5370,7 +5370,7 @@ app.get('/api/tavli_netsis_ym_stp/bulk-all', async (req, res) => {
   }
 });
 
-// Bulk endpoint for all YM STP recipes
+// Toplu Endpoint için Tüm YM STP Reçetes
 app.get('/api/tavli_netsis_ym_stp_recete/bulk-all', async (req, res) => {
   try {
     console.log('📊 BULK: Fetching all YM STP recipes for Excel generation...');

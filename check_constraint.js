@@ -11,7 +11,7 @@ const pool = new Pool({
 
 async function checkConstraint() {
   try {
-    // Get constraint definition
+    // Constraint tanımını getir
     const result = await pool.query(`
       SELECT
         conname AS constraint_name,
@@ -20,10 +20,10 @@ async function checkConstraint() {
       WHERE conname = 'chk_request_product_type_yaglama'
     `);
 
-    console.log('=== CONSTRAINT DEFINITION ===');
+    console.log('=== CONSTRAINT TANIMI ===');
     console.log(JSON.stringify(result.rows, null, 2));
 
-    // Get table columns
+    // Tablo kolonlarını getir
     const cols = await pool.query(`
       SELECT column_name, data_type, is_nullable
       FROM information_schema.columns
@@ -31,7 +31,7 @@ async function checkConstraint() {
       ORDER BY ordinal_position
     `);
 
-    console.log('\n=== TABLE COLUMNS ===');
+    console.log('\n=== TABLO KOLONLARI ===');
     console.log(JSON.stringify(cols.rows, null, 2));
 
     await pool.end();

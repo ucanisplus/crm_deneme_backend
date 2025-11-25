@@ -1,4 +1,4 @@
-// Check Tavli table schemas
+// Tavli tablo şemalarını kontrol et
 require('dotenv').config();
 const { Pool } = require('pg');
 

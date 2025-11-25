@@ -4883,6 +4883,15 @@ app.post('/api/tavli_netsis_ym_tt_recete', async (req, res) => {
   }
 });
 
+// Bulk delete YM TT recipes by ym_tt_stok_kodu (avoids Vercel GET cache issues)
+app.delete('/api/tavli_netsis_ym_tt_recete/bulk/:ym_tt_stok_kodu', async (req, res) => {
+  try {
+    const { ym_tt_stok_kodu } = req.params;
+    const result = await pool.query('DELETE FROM tavli_netsis_ym_tt_recete WHERE ym_tt_stok_kodu = $1 RETURNING *', [ym_tt_stok_kodu]);
+    res.json({ message: `Deleted ${result.rows.length} recipes`, count: result.rows.length });
+  } catch (err) { console.error('Error:', err); res.status(500).json({ error: err.message }); }
+});
+
 app.delete('/api/tavli_netsis_ym_tt_recete/:id', async (req, res) => {
   try {
     const result = await pool.query('DELETE FROM tavli_netsis_ym_tt_recete WHERE id = $1 RETURNING *', [req.params.id]);

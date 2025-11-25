@@ -4883,21 +4883,6 @@ app.post('/api/tavli_netsis_ym_tt_recete', async (req, res) => {
   }
 });
 
-// V2 endpoint to bypass Vercel caching issues
-app.get('/api/tavli_netsis_ym_tt_recete_v2', async (req, res) => {
-  try {
-    const { ym_tt_stok_kodu, mamul_kodu, limit = 2000 } = req.query;
-    let query = 'SELECT * FROM tavli_netsis_ym_tt_recete WHERE 1=1';
-    const params = [];
-    if (ym_tt_stok_kodu) { params.push(ym_tt_stok_kodu); query += ` AND ym_tt_stok_kodu = $${params.length}`; }
-    if (mamul_kodu) { params.push(mamul_kodu); query += ` AND mamul_kodu = $${params.length}`; }
-    query += ' ORDER BY sira_no ASC';
-    if (limit) { params.push(limit); query += ` LIMIT $${params.length}`; }
-    const result = await pool.query(query, params);
-    res.json(result.rows);
-  } catch (err) { console.error('Error:', err); res.status(500).json({ error: err.message }); }
-});
-
 app.delete('/api/tavli_netsis_ym_tt_recete/:id', async (req, res) => {
   try {
     const result = await pool.query('DELETE FROM tavli_netsis_ym_tt_recete WHERE id = $1 RETURNING *', [req.params.id]);
